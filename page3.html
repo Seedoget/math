@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>米 · 分米 · 厘米 · 毫米</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --m:#DE8B57; --m-bg:#FBEEE3;
+  --dm:#7CAF74; --dm-bg:#EEF5EC;
+  --cm:#6F9FD0; --cm-bg:#EBF2FA;
+  --mm:#A98BC9; --mm-bg:#F4EEFB;
+  --bg:#FBF8F3; --card:#FFFFFF;
+  --ink:#3A3A3A; --ink2:#8A8378; --ink3:#B4AC9E;
+  --line:#EDE5D8;
+  --ok:#5FAE7C; --no:#DC7A6A;
+}
+html,body{height:100%}
+body{
+  font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,sans-serif;
+  background:var(--bg);color:var(--ink);
+  -webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none;user-select:none;
+  padding-bottom:24px;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:14px 16px 0}
+
+/* 头部单位阶梯 */
+header{text-align:center;padding:10px 0 6px}
+h1{font-size:21px;font-weight:600;letter-spacing:2px}
+.stepbar{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.step{padding:5px 13px;border-radius:20px;font-size:14px;font-weight:500;border:1.5px solid transparent}
+.step.m{background:var(--m-bg);color:var(--m);border-color:var(--m)}
+.step.dm{background:var(--dm-bg);color:var(--dm);border-color:var(--dm)}
+.step.cm{background:var(--cm-bg);color:var(--cm);border-color:var(--cm)}
+.step.mm{background:var(--mm-bg);color:var(--mm);border-color:var(--mm)}
+.step .s{font-size:12px;opacity:.75;margin-left:3px}
+.arw{color:var(--ink3);font-size:13px}
+
+/* Tab */
+nav{display:flex;gap:8px;justify-content:center;margin:16px 0 12px;flex-wrap:wrap}
+.tab{
+  border:1.5px solid var(--line);background:var(--card);color:var(--ink2);
+  border-radius:14px;padding:9px 16px;font-size:15px;font-weight:500;cursor:pointer;
+  font-family:inherit;transition:.15s;min-height:44px;
+}
+.tab.on{background:#FFF6E9;border-color:#E9C88F;color:#9A6A2E}
+
+.panel{display:none}
+.panel.on{display:block}
+.hint{text-align:center;font-size:13px;color:var(--ink3);margin-bottom:12px;letter-spacing:.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px}
+
+/* ===== 拆一拆 ===== */
+.lane{margin-bottom:4px}
+.laneHead{display:flex;align-items:center;gap:10px;margin:0 0 6px 2px}
+.laneTitle{font-size:17px;font-weight:600;padding:3px 12px;border-radius:12px}
+.countBtn{
+  font-size:12px;color:var(--ink2);background:#fff;border:1px solid var(--line);
+  border-radius:20px;padding:4px 11px;cursor:pointer;font-family:inherit
+}
+.countBtn:disabled{opacity:.4}
+.lcells{display:grid;grid-template-columns:repeat(10,1fr);border-radius:12px;overflow:hidden;border:1.5px solid}
+.cell{
+  display:flex;align-items:center;justify-content:center;font-size:12px;height:46px;
+  cursor:pointer;border-right:1px solid rgba(0,0,0,.07);transition:background .12s,transform .12s
+}
+.cell:last-child{border-right:none}
+.cell:active{transform:scale(.96)}
+.cell.sel{box-shadow:inset 0 0 0 3px rgba(0,0,0,.16);font-weight:600}
+.cell.on{font-size:19px;font-weight:600}
+.wholebar{
+  height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:19px;font-weight:600;border:1.5px dashed
+}
+.zlink{width:100%;height:38px;display:block}
+.zoomwrap{margin-top:2px}
+.zcard{border-radius:18px;padding:10px 12px 12px;border:1.5px dashed;margin-bottom:10px}
+.zhead{display:flex;align-items:center;gap:8px;margin:0 0 8px 2px;flex-wrap:wrap}
+.zglass{width:22px;height:22px;display:flex;align-items:center}
+.zname{font-size:16px;font-weight:600}
+.zbadge{font-size:12px;font-weight:600;padding:2px 10px;border-radius:12px;background:#fff;border:1.2px solid}
+.zbar{overflow:hidden}
+.zfoot{font-size:12px;color:var(--ink2);margin:9px 2px 0;display:flex;justify-content:space-between}
+.realbar{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+.rtitle{font-size:12px;color:var(--ink3);margin-bottom:9px}
+.ritem{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:13px;color:var(--ink2)}
+.rlabel{width:48px;flex:none;text-align:right}
+.rline{height:15px;border-radius:3px;min-width:1px}
+.eqbar{display:flex;flex-direction:column;align-items:center;gap:6px;margin:16px 0 4px;min-height:36px}
+.eq{
+  font-size:17px;font-weight:500;padding:6px 16px;border-radius:14px;background:#fff;border:1px solid var(--line);
+  display:none;animation:pop .3s ease
+}
+.eq.show{display:block}
+.eq.all{font-size:19px;font-weight:600;color:#9A6A2E;background:#FFF6E9;border-color:#E9C88F}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.eq.hit{box-shadow:0 0 0 3px rgba(233,200,143,.55)}
+.ctrl{display:flex;gap:12px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.btn{
+  font-family:inherit;font-size:17px;font-weight:500;border-radius:16px;padding:12px 30px;cursor:pointer;
+  border:1.5px solid transparent;min-height:52px
+}
+.btn.pri{background:var(--m);color:#fff}
+.btn.gh{background:#fff;color:var(--ink2);border-color:var(--line)}
+.btn:disabled{opacity:.35}
+
+/* ===== 量一量 ===== */
+.rulerwrap{position:relative;width:100%;padding-top:72px}
+.rulerwrap svg{width:100%;height:auto;display:block}
+.pencil{
+  position:absolute;top:34px;height:30px;border-radius:5px 2px 2px 5px;
+  background:linear-gradient(#F7C96B,#E5AE4E);display:flex;align-items:center;justify-content:flex-end;
+  touch-action:none;box-shadow:0 2px 6px rgba(0,0,0,.1)
+}
+.pencil .tip{position:absolute;left:-11px;width:0;height:0;border:6px solid transparent;border-right-color:#E8DCC8}
+.pencil .edge{position:absolute;left:0;width:9px;height:30px;background:#C99A3F;border-radius:5px 0 0 5px}
+.handle{
+  position:absolute;right:-16px;top:-4px;width:38px;height:38px;border-radius:50%;
+  background:#fff;border:2.5px solid var(--cm);cursor:ew-resize;touch-action:none;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.12)
+}
+.handle::after{content:"";width:14px;height:2px;background:var(--cm);box-shadow:0 5px 0 var(--cm),0 -5px 0 var(--cm)}
+.target{position:absolute;top:26px;width:0;border-left:2px dashed #DC7A6A;height:130px}
+.target::before{
+  content:"";position:absolute;top:-2px;left:-8px;width:0;height:0;
+  border:8px solid transparent;border-top-color:#DC7A6A
+}
+.readout{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px}
+.ro{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 18px;text-align:center;min-width:120px}
+.ro .k{font-size:12px;color:var(--ink3)}
+.ro .v{font-size:23px;font-weight:600;margin-top:2px}
+.ro.mmz .v{color:var(--mm)} .ro.cmz .v{color:var(--cm)} .ro.dmz .v{color:var(--dm)}
+.taskbar{text-align:center;font-size:17px;margin-bottom:12px}
+.taskbar b{color:#9A6A2E;font-size:22px;font-weight:600}
+.fb{margin-top:16px;text-align:center;font-size:19px;font-weight:600;min-height:30px}
+.fb.ok{color:var(--ok)} .fb.no{color:var(--no)}
+
+/* ===== 换一换 ===== */
+.big-num{text-align:center;font-size:44px;font-weight:600;color:var(--mm);letter-spacing:1px}
+.big-num span{font-size:20px;color:var(--ink2);margin-left:6px}
+.stepper{display:flex;align-items:center;justify-content:center;gap:22px;margin:10px 0}
+.stepper .u{width:52px;font-size:16px;color:var(--ink2);text-align:left}
+.spRow{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:6px 10px}
+.spRow input{
+  width:64px;height:44px;border:none;background:transparent;text-align:center;font-size:26px;font-weight:600;
+  font-family:inherit;color:var(--ink)
+}
+.spBtn{
+  width:46px;height:46px;border-radius:13px;border:1px solid var(--line);background:#FBF8F3;
+  font-size:24px;color:var(--ink2);cursor:pointer;font-family:inherit
+}
+.spBtn:active{background:#F0E9DC}
+
+/* ===== 选一选 ===== */
+.pickwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.scene{
+  width:180px;height:130px;display:flex;align-items:center;justify-content:center;
+  background:#FCFAF6;border-radius:16px
+}
+.scene svg{width:150px;height:110px}
+.sent{font-size:23px;font-weight:500;display:flex;align-items:center;gap:8px}
+.sent i{
+  font-style:normal;display:inline-block;min-width:96px;border-bottom:2.5px solid var(--mm);
+  text-align:center;color:var(--mm)
+}
+.opts{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px}
+.opt{
+  font-family:inherit;font-size:19px;font-weight:500;border-radius:16px;padding:13px 22px;cursor:pointer;
+  border:2px solid;background:#fff;min-width:88px;min-height:54px
+}
+.o-mm{color:var(--mm);border-color:var(--mm-bg)}
+.o-cm{color:var(--cm);border-color:var(--cm-bg)}
+.o-dm{color:var(--dm);border-color:var(--dm-bg)}
+.o-m{color:var(--m);border-color:var(--m-bg)}
+.opt.right{background:var(--ok);color:#fff;border-color:var(--ok)}
+.opt.wrong{border-color:var(--no);color:var(--no);opacity:.55}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.shake{animation:shake .3s}
+.prog{text-align:center;font-size:14px;color:var(--ink3);margin-top:6px}
+
+/* ===== 比一比 ===== */
+.refgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.refcard{
+  background:#fff;border:1.5px solid var(--line);border-radius:20px;padding:14px;text-align:center;
+  cursor:pointer;transition:.15s
+}
+.refcard:active{transform:scale(.98)}
+.refcard .rt{font-size:18px;font-weight:600;margin-bottom:6px}
+.refcard .rw{font-size:13px;color:var(--ink2);line-height:1.7}
+.refcard svg{width:100%;height:118px}
+.rb{border-radius:14px;display:inline-block;padding:2px 10px;font-size:13px;font-weight:500;margin-bottom:4px}
+@media(max-width:640px){
+  .cell{height:40px;font-size:11px}
+  .refgrid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>米 分米 厘米 毫米</h1>
+  <div class="stepbar">
+    <span class="step m">米<span class="s">m</span></span><span class="arw">&#9656;</span>
+    <span class="step dm">分米<span class="s">dm</span></span><span class="arw">&#9656;</span>
+    <span class="step cm">厘米<span class="s">cm</span></span><span class="arw">&#9656;</span>
+    <span class="step mm">毫米<span class="s">mm</span></span>
+  </div>
+</header>
+
+<nav>
+  <button class="tab on" data-t="split">&#9312; 拆一拆</button>
+  <button class="tab" data-t="measure">&#9313; 量一量</button>
+  <button class="tab" data-t="change">&#9314; 换一换</button>
+  <button class="tab" data-t="pick">&#9315; 选一选</button>
+  <button class="tab" data-t="ref">&#9316; 身边的 1</button>
+</nav>
+
+<!-- ① 拆一拆 -->
+<section class="panel on" id="p-split">
+  <div class="card">
+    <div class="hint">点一段，放大镜照过去 &middot; 点「数一数」看它变成 10</div>
+    <div id="ladder"></div>
+    <div class="realbar" id="realbar" hidden></div>
+    <div class="eqbar" id="eqbar"></div>
+    <div class="ctrl">
+      <button class="btn pri" id="btnSplit">分一分</button>
+      <button class="btn gh" id="btnBack">收起来</button>
+    </div>
+  </div>
+</section>
+
+<!-- ② 量一量 -->
+<section class="panel" id="p-measure">
+  <div class="card">
+    <div class="taskbar" id="mTask">拖到 <b id="mGoal">—</b></div>
+    <div class="hint">按住右边的圆点左右拖</div>
+    <div class="rulerwrap" id="rwrap">
+      <div class="pencil" id="pencil">
+        <span class="tip"></span><span class="edge"></span>
+        <span class="handle" id="handle"></span>
+      </div>
+    </div>
+    <div class="readout" id="readout"></div>
+    <div class="fb" id="mFb"></div>
+    <div class="ctrl">
+      <button class="btn gh" id="btnNew">换一个</button>
+    </div>
+  </div>
+</section>
+
+<!-- ③ 换一换 -->
+<section class="panel" id="p-change">
+  <div class="card">
+    <div class="hint">用三种单位，说出同一个长度</div>
+    <div class="big-num" id="cGoal">—<span>毫米</span></div>
+    <div class="stepper" id="cIn"></div>
+    <div class="ctrl">
+      <button class="btn pri" id="cOk">确认</button>
+      <button class="btn gh" id="cNew">换一个</button>
+    </div>
+    <div class="fb" id="cFb"></div>
+  </div>
+</section>
+
+<!-- ④ 选一选 -->
+<section class="panel" id="p-pick">
+  <div class="card">
+    <div class="pickwrap">
+      <div class="scene" id="pkScene"></div>
+      <div class="sent" id="pkSent"></div>
+      <div class="opts" id="pkOpts"></div>
+    </div>
+    <div class="prog" id="pkProg"></div>
+    <div class="ctrl"><button class="btn gh" id="pkNew">重来</button></div>
+  </div>
+</section>
+
+<!-- ⑤ 身边的 1 -->
+<section class="panel" id="p-ref">
+  <div class="card">
+    <div class="hint">点卡片，看「1」有多长</div>
+    <div class="refgrid" id="refGrid"></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+var $ = function(s){ return document.querySelector(s); };
+
+/* ---------- 配色 ---------- */
+var TONE = {
+  m :  {c:'var(--m)',  bg:'var(--m-bg)',  raw:'#DE8B57', soft:'#FBEEE3'},
+  dm : {c:'var(--dm)', bg:'var(--dm-bg)', raw:'#7CAF74', soft:'#EEF5EC'},
+  cm : {c:'var(--cm)', bg:'var(--cm-bg)', raw:'#6F9FD0', soft:'#EBF2FA'},
+  mm : {c:'var(--mm)', bg:'var(--mm-bg)', raw:'#A98BC9', soft:'#F4EEFB'}
+};
+
+/* ================= ① 拆一拆 ================= */
+var LANE_M = {bar:'1 米', tt:'m', cell:'dm', unit:'1分米'};
+var ZOOMS = [
+  {id:'A', src:'M', tt:'dm', cell:'cm', bar:'1 分米', unit:'1厘米', foot:'10 个 1 厘米 = 1 分米'},
+  {id:'B', src:'A', tt:'cm', cell:'mm', bar:'1 厘米', unit:'1毫米', foot:'10 个 1 毫米 = 1 厘米'}
+];
+var GLASS = '<svg viewBox="0 0 24 24" width="21" height="21"><circle cx="10" cy="10" r="6.6" fill="none" stroke="currentColor" stroke-width="2.2"/><line x1="14.7" y1="14.7" x2="20.6" y2="20.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
+var splitState = {stage:0, sel:{M:0, A:0, B:0}, busy:false};
+var animId = {};
+
+function laneOf(key){
+  if(key === 'M') return LANE_M;
+  return (key === 'A') ? ZOOMS[0] : ZOOMS[1];
+}
+
+function buildLadder(){
+  var html = '';
+  html += '<div class="lane">'
+       +  '<div class="laneHead">'
+       +  '<span class="laneTitle" style="background:'+TONE.m.soft+';color:'+TONE.m.raw+'">1 米 · 真实大小</span>'
+       +  '<button class="countBtn" id="cntM">&#9654; 数一数</button>'
+       +  '</div><div id="cellsM"></div></div>';
+  ZOOMS.forEach(function(z){
+    var t = TONE[z.cell];
+    html += '<div class="zoomwrap" id="zw'+z.id+'" hidden>'
+         +  '<svg class="zlink" viewBox="0 0 100 38" preserveAspectRatio="none">'
+         +  '<polygon id="poly'+z.id+'" fill="'+t.soft+'" stroke="'+t.raw+'" stroke-width="0.6" stroke-dasharray="2.4 2.4"/>'
+         +  '</svg>'
+         +  '<div class="zcard" style="background:'+t.soft+';border-color:'+t.raw+'">'
+         +  '<div class="zhead">'
+         +  '<span class="zglass" style="color:'+t.raw+'">'+GLASS+'</span>'
+         +  '<span class="zname" style="color:'+t.raw+'">'+z.bar+' 放大看</span>'
+         +  '<span class="zbadge" style="color:'+t.raw+';border-color:'+t.raw+'">×10</span>'
+         +  '<button class="countBtn" id="cnt'+z.id+'">&#9654; 数一数</button>'
+         +  '</div>'
+         +  '<div class="zbar" id="zbar'+z.id+'"><div id="cells'+z.id+'"></div></div>'
+         +  '<div class="zfoot"><span>'+z.foot+'</span><span>拉宽了 10 倍</span></div>'
+         +  '</div></div>';
+  });
+  $('#ladder').innerHTML = html;
+  ['M','A','B'].forEach(function(k){
+    drawCells(k);
+    $('#cnt'+k).addEventListener('click', function(){ playCount(k); });
+  });
+}
+
+function drawCells(key){
+  var L = laneOf(key), box = $('#cells'+key), t = TONE[L.cell];
+  if(key === 'M' && splitState.stage < 1){
+    box.innerHTML = '<div class="wholebar" style="background:'+t.soft+';border-color:'+t.raw+';color:'+t.raw+'">'
+                  + L.bar + '</div>';
+    box.firstChild.style.cursor = 'pointer';
+    box.firstChild.addEventListener('click', doSplit);
+    return;
+  }
+  var html = '<div class="lcells" style="border-color:'+t.raw+';background:#fff">';
+  for(var i=0;i<10;i++){
+    html += '<div class="cell" data-i="'+i+'" style="background:'+t.soft+';color:'+t.raw+'">'+L.unit+'</div>';
+  }
+  box.innerHTML = html + '</div>';
+  Array.prototype.forEach.call(box.querySelectorAll('.cell'), function(c){
+    c.addEventListener('click', function(){ selectCell(key, +c.dataset.i); });
+  });
+  box.querySelectorAll('.cell')[splitState.sel[key]].classList.add('sel');
+}
+
+function selectCell(key, i){
+  if(splitState.busy) return;
+  if(key === 'M' && splitState.stage < 1) return;
+  splitState.sel[key] = i;
+  drawCells(key);
+  if(key === 'M' && splitState.stage >= 2) zoomAnim('A');
+  if(key === 'A' && splitState.stage >= 3) zoomAnim('B');
+}
+
+/* 放大镜：从被选中的那一段（真实宽度 10%）原地拉宽到 100%，正好放大 10 倍 */
+function zoomAnim(id){
+  var z = (id === 'A') ? ZOOMS[0] : ZOOMS[1];
+  var bar = document.getElementById('zbar'+id), poly = document.getElementById('poly'+id);
+  if(!bar || !poly) return;
+  var i = splitState.sel[z.src], dur = 700, t0 = null;
+  if(animId[id]) cancelAnimationFrame(animId[id]);
+  function step(ts){
+    if(t0 === null) t0 = ts;
+    var p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    var w = 10 + 90 * e, x = i * 10 * (1 - e);
+    bar.style.width = w + '%';
+    bar.style.marginLeft = x + '%';
+    poly.setAttribute('points', (i*10)+',0 '+((i+1)*10)+',0 '+(x+w)+',38 '+x+',38');
+    if(p < 1){
+      animId[id] = requestAnimationFrame(step);
+    } else {
+      bar.style.width = '100%';
+      bar.style.marginLeft = '0';
+      poly.setAttribute('points', (i*10)+',0 '+((i+1)*10)+',0 100,38 0,38');
+    }
+  }
+  animId[id] = requestAnimationFrame(step);
+}
+
+function renderReal(){
+  var items = [
+    {n:'1 分米', w:10,   k:'dm'},
+    {n:'1 厘米', w:1,    k:'cm'},
+    {n:'1 毫米', w:0.1,  k:'mm'}
+  ];
+  var html = '<div class="rtitle">真实大小（和上面 1 米同一把尺）</div>';
+  items.forEach(function(it){
+    html += '<div class="ritem"><span class="rlabel">'+it.n+'</span>'
+         +  '<span class="rline" style="width:'+it.w+'%;background:'+TONE[it.k].raw+'"></span></div>';
+  });
+  $('#realbar').innerHTML = html;
+}
+
+function playCount(key){
+  var box = $('#cells'+key), cells = box.querySelectorAll('.cell');
+  if(cells.length === 0 || splitState.busy) return;
+  splitState.busy = true;
+  document.querySelectorAll('.countBtn').forEach(function(b){ b.disabled = true; });
+  Array.prototype.forEach.call(cells, function(c){ c.classList.remove('sel'); c.textContent = ''; });
+  var i = 0;
+  var tick = function(){
+    if(i < 10){
+      cells[i].textContent = String(i+1);
+      cells[i].classList.add('on');
+      i++;
+      setTimeout(tick, 300);
+    } else {
+      setTimeout(function(){
+        drawCells(key);
+        flashEq(key);
+        splitState.busy = false;
+        refreshSplit();
+      }, 1000);
+    }
+  };
+  tick();
+}
+
+function flashEq(key){
+  var idx = (key === 'M') ? 0 : ((key === 'A') ? 1 : 2);
+  var eq = document.querySelectorAll('.eq')[idx];
+  if(!eq) return;
+  eq.classList.add('hit');
+  setTimeout(function(){ eq.classList.remove('hit'); }, 1200);
+}
+
+function renderEq(){
+  var box = $('#eqbar');
+  var list = [
+    {s:1, txt:'1 米 = 10 分米'},
+    {s:2, txt:'1 分米 = 10 厘米'},
+    {s:3, txt:'1 厘米 = 10 毫米'}
+  ];
+  var html = '';
+  list.forEach(function(e){
+    html += '<div class="eq'+(splitState.stage >= e.s ? ' show' : '')+'">'+e.txt+'</div>';
+  });
+  if(splitState.stage >= 3){
+    html += '<div class="eq all show">1 米 = 10 分米 = 100 厘米 = 1000 毫米</div>';
+  }
+  box.innerHTML = html;
+}
+
+function refreshSplit(){
+  drawCells('M');
+  $('#zwA').hidden = (splitState.stage < 2);
+  $('#zwB').hidden = (splitState.stage < 3);
+  $('#realbar').hidden = (splitState.stage < 1);
+  $('#cntM').disabled = (splitState.stage < 1);
+  $('#cntA').disabled = (splitState.stage < 2);
+  $('#cntB').disabled = (splitState.stage < 3);
+  renderEq();
+  $('#btnSplit').disabled = (splitState.stage >= 3);
+  $('#btnBack').disabled  = (splitState.stage <= 0);
+}
+
+function doSplit(){
+  if(splitState.stage >= 3) return;
+  splitState.stage++;
+  refreshSplit();
+  if(splitState.stage === 2) zoomAnim('A');
+  if(splitState.stage === 3) zoomAnim('B');
+}
+function doBack(){
+  if(splitState.stage <= 0) return;
+  splitState.stage--;
+  refreshSplit();
+  if(splitState.stage === 2) zoomAnim('A');
+}
+buildLadder();
+renderReal();
+$('#btnSplit').addEventListener('click', doSplit);
+$('#btnBack').addEventListener('click', doBack);
+refreshSplit();
+
+/* ================= ② 量一量 ================= */
+var MM_MAX = 100;
+var mState = {len:43, goal:57, from:0};
+var ICON1 = '<svg viewBox="0 0 16 16"></svg>';
+
+function buildRuler(){
+  var svg = '<svg viewBox="0 0 1000 92" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<rect x="0" y="46" width="1000" height="46" fill="#FDF6E9" stroke="#E5D6B8" stroke-width="2" rx="4"/>';
+  for(var i=0;i<=100;i++){
+    var x = i*10, big = (i%10===0), mid = (i%5===0);
+    var y2 = big ? 82 : (mid ? 74 : 66);
+    svg += '<line x1="'+x+'" y1="46" x2="'+x+'" y2="'+y2+'" stroke="'+(big?'#B99A66':'#CDB998')+'" stroke-width="'+(big?2.5:1.6)+'"/>';
+    if(big) svg += '<text x="'+x+'" y="38" text-anchor="middle" font-size="26" fill="#B99A66" font-family="system-ui">'+i+'</text>';
+  }
+  svg += '</svg>';
+  $('#rwrap').insertAdjacentHTML('afterbegin', svg);
+  $('#rwrap').insertAdjacentHTML('beforeend', '<div class="target" id="mline"></div>');
+}
+
+function pxPerMm(){
+  return $('#rwrap').querySelector('svg').getBoundingClientRect().width / MM_MAX;
+}
+
+function paintMeasure(){
+  var k = pxPerMm();
+  var p = $('#pencil');
+  p.style.width = (mState.len * k) + 'px';
+  p.style.left = (mState.from * k) + 'px';
+  $('#mline').style.left = (mState.goal * k) + 'px';
+
+  var L = mState.len;
+  var dm = Math.floor(L/100), cm = Math.floor((L%100)/10), mm = L%10;
+  var rows = [];
+  rows.push({v:L+' 毫米', k:'毫米', cls:'mmz'});
+  if(L >= 10) rows.push({v:(Math.floor(L/10))+' 厘米'+(mm? ' '+mm+' 毫米':''), k:'厘米', cls:'cmz'});
+  if(L >= 100) rows.push({v:dm+' 分米'+(cm? ' '+cm+' 厘米':'')+(mm? ' '+mm+' 毫米':''), k:'分米', cls:'dmz'});
+  var html = '';
+  rows.forEach(function(r){
+    html += '<div class="ro '+r.cls+'"><div class="k">'+r.k+'</div><div class="v">'+r.v+'</div></div>';
+  });
+  $('#readout').innerHTML = html;
+
+  var g = mState.goal;
+  var gd = Math.floor(g/100), gc = Math.floor((g%100)/10), gm = g%10;
+  var txt = (gd? gd+' 分米 ':'') + (gc? gc+' 厘米 ':'') + (gm? gm+' 毫米':'');
+  $('#mGoal').textContent = txt.trim();
+}
+
+function newMeasureTask(){
+  var pool = [];
+  for(var v=25; v<=96; v++) pool.push(v);
+  mState.goal = pool[Math.floor(Math.random()*pool.length)];
+  mState.len  = Math.max(5, mState.goal - 5 - Math.floor(Math.random()*11));
+  mState.from = 0;
+  $('#mFb').textContent = '';
+  $('#mFb').className = 'fb';
+  paintMeasure();
+}
+
+function checkMeasure(){
+  var fb = $('#mFb');
+  if(mState.len === mState.goal){
+    fb.textContent = '正好！量得准';
+    fb.className = 'fb ok';
+    setTimeout(function(){
+      if(mState.len === mState.goal) newMeasureTask();
+    }, 1400);
+  } else {
+    var d = mState.goal - mState.len;
+    fb.innerHTML = (d > 0 ? '还差 '+d+' 毫米' : '多了 '+(-d)+' 毫米');
+    fb.className = 'fb no';
+  }
+}
+
+buildRuler();
+newMeasureTask();
+
+(function bindDrag(){
+  var h = $('#handle'), dragging = false, startX = 0, startLen = 0;
+  h.addEventListener('pointerdown', function(e){
+    dragging = true; startX = e.clientX; startLen = mState.len;
+    h.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  h.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    var d = Math.round((e.clientX - startX) / pxPerMm());
+    var v = startLen + d;
+    v = Math.max(3, Math.min(MM_MAX, v));
+    mState.len = v; paintMeasure();
+    $('#mFb').textContent = '';
+  });
+  h.addEventListener('pointerup', function(){
+    if(!dragging) return;
+    dragging = false; checkMeasure();
+  });
+  h.addEventListener('pointercancel', function(){ dragging = false; });
+})();
+
+$('#btnNew').addEventListener('click', newMeasureTask);
+window.addEventListener('resize', paintMeasure);
+
+/* ================= ③ 换一换 ================= */
+var cState = {goal:250, dm:0, cm:0, mm:0};
+var UNITS = [
+  {k:'dm', name:'分米', base:100, max:99},
+  {k:'cm', name:'厘米', base:10,  max:99},
+  {k:'mm', name:'毫米', base:1,   max:999}
+];
+function unitOf(k){
+  for(var i=0;i<UNITS.length;i++){ if(UNITS[i].k === k) return UNITS[i]; }
+  return UNITS[2];
+}
+function clampU(k, v){
+  return Math.max(0, Math.min(unitOf(k).max, v));
+}
+
+function buildStepper(){
+  var html = '';
+  UNITS.forEach(function(u){
+    html += '<div class="stepper">'
+         +  '<span class="u">'+u.name+'</span>'
+         +  '<div class="spRow">'
+         +  '<button class="spBtn" data-k="'+u.k+'" data-d="-1">&minus;</button>'
+         +  '<input id="in_'+u.k+'" value="0" inputmode="numeric">'
+         +  '<button class="spBtn" data-k="'+u.k+'" data-d="1">&#43;</button>'
+         +  '</div></div>';
+  });
+  $('#cIn').innerHTML = html;
+  Array.prototype.forEach.call(document.querySelectorAll('.spBtn'), function(b){
+    b.addEventListener('click', function(){
+      cState[b.dataset.k] = clampU(b.dataset.k, cState[b.dataset.k] + (+b.dataset.d));
+      syncInput(); $('#cFb').textContent = '';
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.spRow input'), function(ipt){
+    ipt.addEventListener('change', function(){
+      cState[ipt.id.slice(3)] = clampU(ipt.id.slice(3), normalizeNum(ipt.value));
+      syncInput();
+    });
+  });
+}
+
+function normalizeNum(s){
+  var t = String(s).replace(/[\uFF01-\uFF5E]/g, function(ch){
+    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+  }).replace(/\u3000/g, '');
+  var n = parseInt(t.replace(/[^0-9]/g, ''), 10);
+  return isNaN(n) ? 0 : n;
+}
+
+function syncInput(){
+  UNITS.forEach(function(u){ $('#in_'+u.k).value = cState[u.k]; });
+}
+
+function newChangeTask(){
+  cState.goal = 100 + Math.floor(Math.random()*900);
+  cState.dm = 0; cState.cm = 0; cState.mm = 0;
+  syncInput();
+  $('#cGoal').innerHTML = cState.goal + '<span>毫米</span>';
+  $('#cFb').textContent = '';
+  $('#cFb').className = 'fb';
+}
+
+function checkChange(){
+  var total = cState.dm*100 + cState.cm*10 + cState.mm;
+  var fb = $('#cFb');
+  if(total === cState.goal){
+    fb.textContent = '对啦！这就是同一个长度';
+    fb.className = 'fb ok';
+  } else {
+    fb.textContent = '差了 ' + Math.abs(cState.goal - total) + ' 毫米';
+    fb.className = 'fb no';
+  }
+}
+
+buildStepper();
+newChangeTask();
+$('#cOk').addEventListener('click', checkChange);
+$('#cNew').addEventListener('click', newChangeTask);
+
+/* ================= ④ 选一选 ================= */
+var ICON = {
+  book:'<svg viewBox="0 0 120 90"><rect x="18" y="56" width="86" height="12" rx="3" fill="#F0BFA4"/><rect x="18" y="56" width="86" height="4" rx="2" fill="#DE9069"/><rect x="22" y="42" width="80" height="13" rx="3" fill="#9FD0C2"/><rect x="22" y="42" width="80" height="4" rx="2" fill="#74B4A2"/><rect x="26" y="28" width="74" height="13" rx="3" fill="#F3D8A6"/><rect x="26" y="28" width="74" height="4" rx="2" fill="#DCB877"/></svg>',
+  pencil:'<svg viewBox="0 0 120 90"><g transform="rotate(-10 60 45)"><rect x="14" y="38" width="76" height="15" rx="2" fill="#F5C96B"/><rect x="14" y="38" width="10" height="15" fill="#D9A441"/><rect x="14" y="42" width="76" height="3" fill="#E9BE5E"/><polygon points="90,38 106,45.5 90,53" fill="#EDE4D2"/><polygon points="99,41.5 106,45.5 99,49.5" fill="#8C8474"/><rect x="90" y="38" width="6" height="15" fill="#DFB0AF"/></g></svg>',
+  desk:'<svg viewBox="0 0 120 90"><rect x="12" y="26" width="96" height="10" rx="3" fill="#D9B48F"/><rect x="12" y="26" width="96" height="4" rx="2" fill="#C39A6F"/><rect x="22" y="36" width="8" height="46" rx="2" fill="#C9A87F"/><rect x="90" y="36" width="8" height="46" rx="2" fill="#C9A87F"/><rect x="26" y="46" width="60" height="6" rx="2" fill="#DCC3A0"/><rect x="26" y="70" width="60" height="5" rx="2" fill="#DCC3A0"/></svg>',
+  room:'<svg viewBox="0 0 120 90"><rect x="10" y="12" width="100" height="42" rx="3" fill="#CFE3D6" stroke="#9CBFA9" stroke-width="2"/><rect x="18" y="20" width="84" height="26" rx="2" fill="#F4FBF6"/><line x1="26" y1="30" x2="60" y2="30" stroke="#A8CDB6" stroke-width="3"/><line x1="26" y1="38" x2="52" y2="38" stroke="#A8CDB6" stroke-width="3"/><line x1="10" y1="70" x2="110" y2="70" stroke="#D8C7AC" stroke-width="3"/><rect x="76" y="54" width="30" height="16" rx="2" fill="#EFE2CD"/></svg>',
+  paper:'<svg viewBox="0 0 120 90"><polygon points="22,62 98,62 104,68 28,68" fill="#CBD9EA"/><polygon points="22,55 98,55 104,61 28,61" fill="#E4EDF6"/><polygon points="22,48 98,48 104,54 28,54" fill="#FFFFFF"/><polygon points="22,41 98,41 104,47 28,47" fill="#E4EDF6"/><polygon points="22,62 22,68 28,68 28,62" fill="#AFC4DD"/></svg>',
+  chalk:'<svg viewBox="0 0 120 90"><rect x="16" y="40" width="44" height="12" rx="6" fill="#FFFDF4" stroke="#E2D6BA" stroke-width="2"/><rect x="66" y="40" width="38" height="12" rx="6" fill="#FFFDF4" stroke="#E2D6BA" stroke-width="2"/><polygon points="60,40 66,40 66,52 60,52" fill="#EFE6CF"/><polygon points="16,44 60,44 60,48 16,48" fill="#F7F1DF"/></svg>',
+  door:'<svg viewBox="0 0 120 90"><rect x="26" y="8" width="66" height="74" rx="4" fill="#EFDFC7" stroke="#C9A87F" stroke-width="2.5"/><rect x="34" y="16" width="50" height="26" rx="2" fill="#FBF4E8" stroke="#D8C0A0" stroke-width="2"/><rect x="34" y="50" width="50" height="24" rx="2" fill="#FBF4E8" stroke="#D8C0A0" stroke-width="2"/><circle cx="84" cy="42" r="3.5" fill="#C9A87F"/></svg>',
+  hand:'<svg viewBox="0 0 120 90"><path d="M26 66 Q22 50 30 42 L34 20 Q37 14 41 18 L43 34 L50 16 Q54 11 58 16 L59 34 L66 20 Q70 15 74 20 L73 38 L80 28 Q85 24 88 29 L89 52 Q89 68 72 70 Z" fill="#F9DDC7" stroke="#E3B692" stroke-width="2"/><path d="M44 52 Q56 46 70 52" stroke="#E3B692" stroke-width="2" fill="none"/></svg>',
+  finger:'<svg viewBox="0 0 120 90"><rect x="42" y="14" width="30" height="66" rx="14" fill="#F9DDC7" stroke="#E3B692" stroke-width="2"/><ellipse cx="57" cy="28" rx="11" ry="13" fill="#FFF1E4" stroke="#E3B692" stroke-width="2"/><line x1="42" y1="52" x2="72" y2="52" stroke="#E3B692" stroke-width="2"/></svg>',
+  platform:'<svg viewBox="0 0 120 90"><rect x="14" y="30" width="92" height="10" rx="3" fill="#D3C0A2"/><rect x="14" y="30" width="92" height="4" rx="2" fill="#BCA484"/><rect x="22" y="40" width="76" height="42" rx="3" fill="#EFE3CB" stroke="#CDB68F" stroke-width="2"/><rect x="32" y="48" width="24" height="26" rx="2" fill="#FBF5E8" stroke="#DCC9A6" stroke-width="2"/><rect x="66" y="48" width="24" height="26" rx="2" fill="#FBF5E8" stroke="#DCC9A6" stroke-width="2"/></svg>'
+};
+
+var PICKS = [
+  {ic:'book',  txt:'数学书厚', n:6,   a:'mm', tip:'书很薄，用毫米'},
+  {ic:'pencil',txt:'铅笔长',   n:18,  a:'cm', tip:'比手掌长一点'},
+  {ic:'desk',  txt:'课桌高',   n:7,   a:'dm', tip:'比椅子高一点'},
+  {ic:'room',  txt:'教室长',   n:9,   a:'m',  tip:'要走好几步'},
+  {ic:'paper', txt:'10 张纸厚',n:1,   a:'mm', tip:'薄薄一叠'},
+  {ic:'chalk', txt:'粉笔长',   n:1,   a:'dm', tip:'比手掌短一点'},
+  {ic:'door',  txt:'门高',     n:2,   a:'m',  tip:'比老师矮一点'},
+  {ic:'hand',  txt:'手掌宽',   n:7,   a:'cm', tip:'张开的手'},
+  {ic:'finger',txt:'指甲宽',   n:1,   a:'cm', tip:'一个手指头'},
+  {ic:'platform',txt:'讲台高', n:1,   a:'m',  tip:'到老师的腰'}
+];
+var OPTN = [['mm','毫米'],['cm','厘米'],['dm','分米'],['m','米']];
+var pkState = {order:[], i:0};
+
+function shuffle(a){
+  a = a.slice();
+  for(var i=a.length-1;i>0;i--){
+    var j = Math.floor(Math.random()*(i+1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+function newPickGame(){
+  pkState.order = shuffle(PICKS.map(function(_, i){ return i; })).slice(0, 8);
+  pkState.i = 0;
+  renderPick();
+}
+
+function renderPick(){
+  var q = PICKS[pkState.order[pkState.i]];
+  $('#pkScene').innerHTML = ICON[q.ic];
+  $('#pkSent').innerHTML = q.txt + ' ' + q.n + ' <i> ? </i>';
+  var opts = shuffle(OPTN);
+  var html = '';
+  opts.forEach(function(o){
+    html += '<button class="opt o-'+o[0]+'" data-k="'+o[0]+'">'+o[1]+'</button>';
+  });
+  var box = $('#pkOpts');
+  box.innerHTML = html;
+  Array.prototype.forEach.call(box.querySelectorAll('.opt'), function(b){
+    b.addEventListener('click', function(){ answerPick(q, b); });
+  });
+  $('#pkProg').textContent = (pkState.i + 1) + ' / ' + pkState.order.length;
+}
+
+function answerPick(q, btn){
+  if(btn.classList.contains('right') || btn.classList.contains('wrong')) return;
+  if(btn.dataset.k === q.a){
+    btn.classList.add('right');
+    btn.textContent = '✓ ' + btn.textContent;
+    setTimeout(function(){
+      if(pkState.i < pkState.order.length - 1){
+        pkState.i++; renderPick();
+      } else {
+        $('#pkSent').innerHTML = '全对啦 <i> ★ </i>';
+        $('#pkScene').innerHTML = '';
+        $('#pkOpts').innerHTML = '';
+        $('#pkProg').textContent = '8 / 8';
+      }
+    }, 900);
+  } else {
+    btn.classList.add('wrong');
+    btn.classList.add('shake');
+    setTimeout(function(){ btn.classList.remove('shake'); }, 320);
+    $('#pkProg').textContent = q.tip;
+  }
+}
+
+newPickGame();
+$('#pkNew').addEventListener('click', function(){ newPickGame(); });
+
+/* ================= ⑤ 身边的 1 ================= */
+var REFS = [
+  {u:'1 毫米', tone:'mm', ic:'paper',   t:'10 张纸 叠起来', d:'银行卡、硬币的厚度'},
+  {u:'1 厘米', tone:'cm', ic:'finger',  t:'食指指甲 的宽',  d:'田字格的一个小格'},
+  {u:'1 分米', tone:'dm', ic:'hand',    t:'手掌张开 一拃',  d:'粉笔、手掌的长度'},
+  {u:'1 米',   tone:'m',  ic:'platform',t:'到小朋友 胸口',  d:'讲台的高度、门的一半'}
+];
+
+function buildRefs(){
+  var html = '';
+  REFS.forEach(function(r){
+    html += '<div class="refcard" data-u="'+r.u+'">'
+         +  '<span class="rb" style="background:'+TONE[r.tone].soft+';color:'+TONE[r.tone].raw+'">'+r.u+'</span>'
+         +  '<div>'+ICON[r.ic]+'</div>'
+         +  '<div class="rt">'+r.t+'</div>'
+         +  '<div class="rw">'+r.d+'</div>'
+         +  '</div>';
+  });
+  $('#refGrid').innerHTML = html;
+}
+buildRefs();
+
+/* ================= Tab 切换 ================= */
+Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(b){
+  b.addEventListener('click', function(){
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(x){ x.classList.remove('on'); });
+    Array.prototype.forEach.call(document.querySelectorAll('.panel'), function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    $('#p-' + b.dataset.t).classList.add('on');
+    if(b.dataset.t === 'measure') paintMeasure();
+  });
+});
+</script>
+</body>
+</html>
