@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>称重实验室 · 认识质量单位</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#2b2f36; --sub:#6b7280;
+    --accent:#3567d6; --line:#e5e7eb; --red:#e5484d; --ok:#1a7f4b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink);
+    display:flex; flex-direction:column; height:100dvh; overflow:hidden;
+  }
+  header{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:10px 14px; background:var(--card); border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:18px; font-weight:700; letter-spacing:1px;}
+  #hint{flex:1; font-size:13px; color:var(--sub); text-align:center;}
+  #recordBtn{
+    border:1px solid var(--line); background:#fafbfc; border-radius:8px;
+    font-size:13px; padding:6px 10px; color:var(--ink); cursor:pointer;
+  }
+  #recordBtn b{color:var(--accent);}
+
+  main{flex:1 1 auto; display:flex; flex-direction:column; min-height:0;}
+
+  /* 秤选择条 */
+  #scalePicker{
+    flex:0 0 auto; display:flex; gap:8px; padding:8px 10px;
+    overflow-x:auto; background:var(--bg);
+  }
+  .scaleCard{
+    flex:0 0 auto; width:86px; background:var(--card); border:2px solid var(--line);
+    border-radius:10px; padding:6px 4px 5px; text-align:center; cursor:pointer;
+  }
+  .scaleCard svg{width:64px; height:52px; display:block; margin:0 auto;}
+  .scaleCard .nm{font-size:12px; margin-top:2px; color:var(--ink);}
+  .scaleCard .rg{font-size:10px; color:var(--sub);}
+  .scaleCard.sel{border-color:var(--accent); background:#f0f4ff;}
+  .scaleCard.sel .nm{color:var(--accent); font-weight:700;}
+
+  /* 舞台 */
+  #stage{
+    flex:1 1 auto; position:relative; display:flex; flex-direction:column;
+    align-items:center; justify-content:flex-start; padding:4px 10px 0; min-height:0;
+  }
+  #scaleWrap{width:min(92vw,420px); max-height:100%; position:relative;}
+  #scaleWrap svg{width:100%; height:auto; display:block;}
+  #dropZone{
+    position:absolute; inset:0; display:flex; align-items:flex-start; justify-content:center;
+    pointer-events:none;
+  }
+  #readout{
+    flex:0 0 auto; min-height:58px; text-align:center; padding:2px 8px 4px;
+  }
+  #readout .big{font-size:30px; font-weight:800; letter-spacing:1px;}
+  #readout .cv{font-size:13px; color:var(--sub); margin-top:1px;}
+  #readout .warn{font-size:17px; font-weight:700; color:var(--red);}
+  .revealBtn{
+    margin-top:4px; padding:8px 26px; border:none; border-radius:9px;
+    background:var(--accent); color:#fff; font-size:15px; font-weight:600;
+    cursor:pointer; letter-spacing:2px;
+  }
+  .revealBtn:active{opacity:.85;}
+
+  /* 物品栏 */
+  #objectsBar{
+    flex:0 0 auto; display:flex; gap:8px; padding:8px 10px calc(10px + env(safe-area-inset-bottom));
+    overflow-x:auto; background:var(--card); border-top:1px solid var(--line);
+  }
+  .objChip{
+    flex:0 0 auto; width:76px; text-align:center; background:#fafbfc;
+    border:1.5px solid var(--line); border-radius:10px; padding:6px 2px 5px;
+    cursor:grab; touch-action:none; user-select:none;
+  }
+  .objChip .ic{height:34px; display:flex; align-items:center; justify-content:center; font-size:28px; pointer-events:none;}
+  .objChip .ic svg{width:30px; height:30px;}
+  .objChip .nm{font-size:11px; color:var(--ink); pointer-events:none; line-height:1.25;}
+  .objChip.dragging{opacity:.35;}
+  .dragGhost{
+    position:fixed; z-index:60; pointer-events:none; font-size:36px;
+    filter:drop-shadow(0 4px 6px rgba(0,0,0,.25)); transform:translate(-50%,-60%);
+  }
+
+  /* 记录面板 */
+  #recordPanel{
+    position:fixed; inset:0; background:rgba(15,18,24,.45); z-index:80;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  #recordPanel[hidden]{display:none;}
+  #recordCard{
+    background:var(--card); border-radius:14px; width:min(92vw,460px);
+    max-height:80vh; overflow:auto; padding:16px;
+  }
+  #recordCard h2{font-size:16px; margin-bottom:10px;}
+  #recordCard table{width:100%; border-collapse:collapse; font-size:13px;}
+  #recordCard th,#recordCard td{border-bottom:1px solid var(--line); padding:7px 4px; text-align:left;}
+  #recordCard th{color:var(--sub); font-weight:600; font-size:12px;}
+  #recordCard .close{
+    margin-top:12px; width:100%; padding:9px; border:none; border-radius:9px;
+    background:var(--accent); color:#fff; font-size:14px; cursor:pointer;
+  }
+  #recordEmpty{color:var(--sub); font-size:13px; text-align:center; padding:18px 0;}
+
+  /* toast */
+  #toast{
+    position:fixed; left:50%; bottom:110px; transform:translateX(-50%) translateY(8px);
+    background:rgba(30,34,40,.92); color:#fff; font-size:14px; line-height:1.5;
+    padding:9px 16px; border-radius:10px; z-index:70; opacity:0; pointer-events:none;
+    transition:opacity .25s, transform .25s; max-width:86vw; text-align:center;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<header>
+  <h1>称重实验室</h1>
+  <div id="hint">第一步：选一个秤</div>
+  <button id="recordBtn">称重记录（<b id="recordCount">0</b>）</button>
+</header>
+
+<main>
+  <div id="scalePicker"></div>
+  <section id="stage">
+    <div id="scaleWrap"></div>
+  </section>
+  <div id="readout"></div>
+  <div id="objectsBar"></div>
+</main>
+
+<div id="recordPanel" hidden>
+  <div id="recordCard">
+    <h2>称重记录</h2>
+    <div id="recordBody"></div>
+    <button class="close" id="recordClose">关闭</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ============ 数据 ============ */
+const OBJECTS = [
+  {id:'garlic', name:'一头大蒜', g:50,    icon:'<svg viewBox="0 0 30 30"><path d="M15 8 C8 10 6 15 7 20 C8 24 12 26 15 26 C18 26 22 24 23 20 C24 15 22 10 15 8 Z" fill="#f3ead8" stroke="#c9b98f" stroke-width="1.2"/><path d="M15 9 V26 M11 10 C10 15 10.5 20 12 25 M19 10 C20 15 19.5 20 18 25" stroke="#d8c9a3" stroke-width="1.2" fill="none"/><path d="M13 8 Q15 3 17 8 Z" fill="#a9c68c"/></svg>'},
+  {id:'mass',   name:'砝码',     g:500,   icon:'<svg viewBox="0 0 30 30"><rect x="10" y="3" width="10" height="6" rx="1" fill="#444"/><path d="M6 10 h18 l3 16 a3 3 0 0 1 -3 3 H6 a3 3 0 0 1 -3 -3 z" fill="#666"/><text x="15" y="23" text-anchor="middle" font-size="8" fill="#fff">500g</text></svg>'},
+  {id:'cake',   name:'一块蛋糕', g:100,   icon:'<svg viewBox="0 0 30 30"><rect x="5" y="13" width="20" height="12" rx="2" fill="#f6c453"/><path d="M5 14 q2.5 -4.5 5 0 q2.5 -4.5 5 0 q2.5 -4.5 5 0 q2.5 -4.5 5 0 v3 H5 z" fill="#fdf6e8"/><circle cx="10" cy="19" r="1.4" fill="#e5484d"/><circle cx="15" cy="21" r="1.4" fill="#e5484d"/><circle cx="20" cy="19" r="1.4" fill="#e5484d"/></svg>'},
+  {id:'eggplant',name:'一个茄子',g:250,   icon:'<svg viewBox="0 0 30 30"><path d="M16 9 c4 -1 7 2 7 6 c0 6 -4 12 -11 12 c-5 0 -8 -3 -7 -7 c1 -5 6 -5 9 -8 c1.5 -1.2 1 -2.5 2 -3 z" fill="#6b4f9e"/><path d="M14 5 q3 -2 5 1 q-1 4 -5 4 q-2 -2 0 -5 z" fill="#4caf7d"/></svg>'},
+  {id:'melon',  name:'一个西瓜', g:4000,  icon:'<svg viewBox="0 0 30 30"><circle cx="15" cy="16" r="11" fill="#57b75c"/><path d="M9 7.5 q1.5 8.5 0 17 M15 5 q1.5 11 0 22 M21 7.5 q-1.5 8.5 0 17" stroke="#2e7d32" stroke-width="2" fill="none"/><path d="M22 6 q4 1 4 4" stroke="#6b4f2a" stroke-width="1.8" fill="none"/></svg>'},
+  {id:'child',  name:'小朋友',   g:25000, icon:'<svg viewBox="0 0 30 30"><path d="M9 8 q6 -7 12 0 q1 3 0 5 h-12 q-1 -2 0 -5 z" fill="#4a3626"/><circle cx="15" cy="10" r="5" fill="#ffd9b3"/><path d="M10 10 q5 -4 10 0" fill="#4a3626"/><circle cx="13" cy="11" r=".8" fill="#333"/><circle cx="17" cy="11" r=".8" fill="#333"/><path d="M15 15 L8 27 h14 z" fill="#e5484d"/><path d="M12 27 h6 v2 h-6 z" fill="#c73a3f"/></svg>'},
+  {id:'pencil', name:'一支铅笔', g:6,     icon:'<svg viewBox="0 0 30 30"><g transform="rotate(45 15 15)"><rect x="12.5" y="2" width="5" height="17" fill="#f6c453"/><rect x="12.5" y="2" width="5" height="3" fill="#e5484d"/><path d="M12.5 19 h5 l-2.5 7 z" fill="#efc79a"/><path d="M13.7 23.3 l1.3 2.7 l1.3 -2.7 z" fill="#4a3626"/></g></svg>'},
+  {id:'eraser', name:'一块橡皮', g:25,    icon:'<svg viewBox="0 0 30 30"><g transform="rotate(-20 15 15)"><rect x="5" y="9" width="20" height="12" rx="2.5" fill="#f28ba8"/><rect x="5" y="9" width="8" height="12" rx="2.5" fill="#5aa7e8"/></g></svg>'},
+  {id:'egg',    name:'一个鸡蛋', g:55,    icon:'<svg viewBox="0 0 30 30"><ellipse cx="15" cy="17" rx="8" ry="10" fill="#f7f3ea" stroke="#d9cfc0" stroke-width="1.2"/></svg>'},
+  {id:'apple',  name:'一个苹果', g:220,   icon:'<svg viewBox="0 0 30 30"><circle cx="15" cy="18" r="9.5" fill="#e5484d"/><path d="M15 9 q1 -4 4 -5.5" stroke="#7a5230" stroke-width="1.8" fill="none"/><ellipse cx="19.5" cy="6.5" rx="3.5" ry="1.8" fill="#4caf7d" transform="rotate(-25 19.5 6.5)"/><path d="M10.5 13 q-2 2 -1.5 5" stroke="#f28b8b" stroke-width="1.5" fill="none"/></svg>'},
+  {id:'book',   name:'数学课本', g:350,   icon:'<svg viewBox="0 0 30 30"><rect x="6" y="5" width="18" height="20" rx="2" fill="#d64545"/><rect x="6" y="5" width="4" height="20" rx="2" fill="#b83a3a"/><rect x="13" y="10" width="8" height="1.6" rx=".8" fill="#fff" opacity=".9"/><rect x="13" y="14" width="8" height="1.6" rx=".8" fill="#fff" opacity=".9"/><rect x="13" y="18" width="5" height="1.6" rx=".8" fill="#fff" opacity=".9"/></svg>'},
+  {id:'salt',   name:'一袋盐',   g:500,   icon:'<svg viewBox="0 0 30 30"><path d="M8 8 h14 l2.5 18 H5.5 z" fill="#eef1f5" stroke="#c6cbd4" stroke-width="1.2"/><path d="M8 8 q7 3.5 14 0" fill="#dde3ea"/><text x="15" y="21" font-size="8" text-anchor="middle" fill="#5b8def" font-weight="bold">盐</text></svg>'},
+  {id:'water',  name:'一瓶矿泉水',g:550,  icon:'<svg viewBox="0 0 30 30"><path d="M12 6 h6 v3 q3.5 3 3.5 7 v9.5 a2 2 0 0 1 -2 2 h-9 a2 2 0 0 1 -2 -2 V16 q0 -4 3.5 -7 z" fill="#bfe0f5" stroke="#7fb6dd" stroke-width="1.2"/><rect x="11.5" y="3" width="7" height="3.5" rx="1" fill="#5b8def"/><rect x="9.5" y="16" width="11" height="5" rx="1" fill="#fff" opacity=".85"/><text x="15" y="20.4" font-size="4.5" text-anchor="middle" fill="#5b8def">纯净水</text></svg>'},
+  {id:'ball',   name:'一个篮球', g:600,   icon:'<svg viewBox="0 0 30 30"><circle cx="15" cy="15" r="11" fill="#f08c42"/><path d="M4 15 h22 M15 4 v22 M7.5 7 q7.5 8 0 16 M22.5 7 q-7.5 8 0 16" stroke="#a34d16" stroke-width="1.5" fill="none"/></svg>'},
+  {id:'bag',    name:'一个书包', g:3500,  icon:'<svg viewBox="0 0 30 30"><rect x="7" y="9" width="16" height="17" rx="5" fill="#4a90d9"/><path d="M11 9 q4 -7 8 0" stroke="#2f6bb0" stroke-width="2.4" fill="none"/><rect x="7" y="16" width="16" height="3.5" fill="#2f6bb0"/><rect x="12" y="18" width="6" height="5.5" rx="1" fill="#f2c14e"/></svg>'},
+  {id:'rice',   name:'一袋大米', g:5000,  icon:'<svg viewBox="0 0 30 30"><path d="M9 7 h12 l3 19 H6 z" fill="#f5efe0" stroke="#d9cfb4" stroke-width="1.2"/><path d="M9 7 q6 3 12 0" fill="#e8dfc8"/><text x="15" y="21" font-size="8" text-anchor="middle" fill="#8a9a5b" font-weight="bold">米</text></svg>'},
+];
+
+/* 秤：range/res 单位为克 */
+const SCALES = [
+  {id:'pan',     name:'盘秤',     unit:'g', range:500,    res:10,  type:'dial',    body:'#4caf7d', sweep:180},
+  {id:'balance', name:'天平',     unit:'g', range:200,    res:1,   type:'balance'},
+  {id:'kitchen', name:'电子秤',   unit:'g', range:2000,   res:1,   type:'digital', body:'#e8eaf0'},
+  {id:'spring',  name:'台秤',     unit:'kg',range:5000,   res:50,  type:'dial',    body:'#c8cdd6', sweep:180},
+  {id:'platform',name:'电子台秤', unit:'kg',range:10000,  res:10,  type:'digital', body:'#dfe3ea'},
+  {id:'body',    name:'体重秤',   unit:'kg',range:50000,  res:500, type:'dial',    body:'#9aa3b0', sweep:180},
+];
+
+/* 天平砝码盒（克） */
+const BAL_WEIGHTS = [100,50,20,10,5,1];
+
+/* ============ 状态 ============ */
+let selScale = null;      // 当前选中的秤
+let busy = false;         // 称重动画中
+let records = [];         // 称重记录
+let animId = null;
+let objOnScale = null;    // 放上秤的物体
+
+const $ = s => document.querySelector(s);
+const hint = $('#hint'), readout = $('#readout'), scaleWrap = $('#scaleWrap');
+
+/* ============ 工具 ============ */
+function fmtKg(g){ // 克 → 千克字符串
+  const v = g/1000;
+  return (Math.round(v*100)/100).toString().replace(/\.0+$/,'');
+}
+function readingOf(scale, g){ // 按秤的单位与分度值取读数
+  const rounded = Math.round(g/scale.res)*scale.res;
+  return scale.unit==='g' ? rounded : Math.round((rounded/1000)*100)/100;
+}
+function readingText(scale, val){
+  return scale.unit==='g' ? val+' g' : val+' kg';
+}
+let toastTimer=null;
+function toast(msg, ms=2200){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), ms);
+}
+
+/* ============ SVG 生成 ============ */
+const NS='http://www.w3.org/2000/svg';
+function el(tag, attrs, parent){
+  const n=document.createElementNS(NS, tag);
+  for(const k in attrs) n.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(n);
+  return n;
+}
+/* 表盘：cx,cy 半径 r，0..rangeG 克，扫过角度 sweep（默认270°），居中分布；unitDy 为单位文字相对圆心的纵向偏移 */
+function drawDialFace(svg, cx, cy, r, rangeG, unit, tickStep, labelStep, faceR, sweep, labelFont, unitDy){
+  faceR = faceR || r;
+  sweep = sweep || 270;
+  el('circle',{cx,cy,r:faceR,fill:'#fdfdf8',stroke:'#3a3f47','stroke-width':2.5},svg);
+  const a0=-sweep/2, a1=sweep/2;
+  const toXY = g => {
+    const t = Math.min(g/rangeG,1);
+    const a = (a0 + (a1-a0)*t) * Math.PI/180;
+    return [cx + Math.sin(a)*r, cy - Math.cos(a)*r];
+  };
+  for(let g=0; g<=rangeG+0.001; g+=tickStep){
+    const [x1,y1]=toXY(g), a=(a0+(a1-a0)*Math.min(g/rangeG,1))*Math.PI/180;
+    const long = Math.abs(g%labelStep)<1e-6;
+    const x2 = cx+Math.sin(a)*(r-(long?9:5)), y2 = cy-Math.cos(a)*(r-(long?9:5));
+    el('line',{x1,y1,x2,y2,stroke:long?'#2b2f36':'#8a8f98','stroke-width':long?2.2:1.4},svg);
+    if(long){
+      const lx = cx+Math.sin(a)*(r-20), ly = cy-Math.cos(a)*(r-20);
+      const t = el('text',{x:lx,y:ly+4,'text-anchor':'middle','font-size':labelFont||(faceR>40?13:11),fill:'#2b2f36','font-weight':600},svg);
+      const show = unit==='kg' ? (g/1000).toString().replace(/\.0+$/,'') : g;
+      t.textContent = show;
+    }
+  }
+  // 单位：默认圆心下方；半圆表盘可用 unitDy 自定义位置
+  const uy = unitDy!==undefined ? cy + unitDy : cy + r*0.55;
+  const tu = el('text',{x:cx,y:uy,'text-anchor':'middle','font-size':faceR>40?12:10,fill:'#6b7280'},svg);
+  tu.textContent = unit;
+}
+function needle(svg, cx, cy, len){
+  const g = el('g',{},svg);
+  el('line',{x1:cx,y1:cy+6,x2:cx,y2:cy-len,stroke:'#e5484d','stroke-width':3.2,'stroke-linecap':'round'},g);
+  el('circle',{cx,cy,r:4.5,fill:'#e5484d'},g);
+  return g;
+}
+/* 让针指向 value(克)，秤量程 rangeG，扫角 sweep */
+function setNeedle(gEl, cx, cy, value, rangeG, sweep){
+  sweep = sweep || 270;
+  const t = Math.max(0, Math.min(value/rangeG, 1.06));
+  const a = -sweep/2 + sweep*t;
+  gEl.setAttribute('transform', `rotate(${a} ${cx} ${cy})`);
+}
+
+/* ---- 各秤 SVG（viewBox 0 0 300 260，物体放置点 pan:{x,y}） ---- */
+function buildScaleSVG(sc){
+  const svg = el('svg',{viewBox:'0 0 300 260'});
+  svg.dataset.sid = sc.id;
+  let pan, needleEl=null, lcd=null, lcdUnit=null, dialRangeG=sc.range;
+
+  if(sc.id==='pan'){ // 绿色盘秤：半圆表盘（0 在左），指针初始指向 0
+    el('rect',{x:60,y:60,width:180,height:170,rx:26,fill:sc.body},svg);
+    el('circle',{cx:150,cy:150,r:72,fill:'#fdfdf8',stroke:'#2f6b4f','stroke-width':3},svg);
+    drawDialFace(svg,150,150,58,sc.range,'g',50,100,72,180,11,26);
+    needleEl = needle(svg,150,150,52);
+    setNeedle(needleEl,150,150,0,sc.range,180);
+    // 顶杆与托盘
+    el('rect',{x:143,y:40,width:14,height:22,fill:'#3a8a63'},svg);
+    el('rect',{x:55,y:26,width:190,height:14,rx:7,fill:'#3a8a63'},svg);
+    pan = {x:150,y:26};
+  }
+  else if(sc.id==='balance'){ // 托盘天平
+    el('rect',{x:135,y:200,width:30,height:16,rx:4,fill:'#8a93a3'},svg);
+    el('rect',{x:110,y:214,width:80,height:10,rx:5,fill:'#aab2c0'},svg);
+    el('rect',{x:146,y:96,width:8,height:106,fill:'#7d8695'},svg);
+    const beam = el('g',{id:'beam'},svg);
+    el('rect',{x:40,y:92,width:220,height:9,rx:4.5,fill:'#5b6472'},beam);
+    el('circle',{cx:150,cy:96,r:7,fill:'#39404d'},beam);
+    // 左右吊盘
+    [[70,'L'],[230,'R']].forEach(([x,side])=>{
+      const g = el('g',{class:'panG', 'data-side':side},beam);
+      el('line',{x1:x,y1:101,x2:x-24,y2:140,stroke:'#7d8695','stroke-width':2.5},g);
+      el('line',{x1:x,y1:101,x2:x+24,y2:140,stroke:'#7d8695','stroke-width':2.5},g);
+      el('path',{d:`M ${x-30} 140 h 60 a 4 4 0 0 1 -6 8 h -48 a 4 4 0 0 1 -6 -8 z`,fill:'#c2c9d4'},g);
+    });
+    pan = {x:70,y:132, beamPan:true};
+  }
+  else if(sc.id==='kitchen'){ // 电子厨房秤：大液晶屏（数字 + 单位）
+    el('rect',{x:45,y:120,width:210,height:70,rx:16,fill:sc.body},svg);
+    el('path',{d:'M55 120 q95 -70 190 0 z',fill:'#d4d8e0'},svg); // 秤面斜面
+    el('ellipse',{cx:150,cy:78,rx:96,ry:14,fill:'#eef0f4',stroke:'#c6cbd4','stroke-width':2},svg);
+    el('rect',{x:80,y:138,width:140,height:40,rx:6,fill:'#1f2a1f'},svg);
+    lcd = el('text',{x:130,y:168,'text-anchor':'middle','font-size':26,fill:'#7dff8a','font-family':'Consolas,monospace','font-weight':700},svg);
+    lcd.textContent = '0';
+    lcdUnit = el('text',{x:190,y:166,'text-anchor':'middle','font-size':14,fill:'#7dff8a','font-family':'Consolas,monospace','font-weight':700},svg);
+    lcdUnit.textContent = 'g';
+    pan = {x:150,y:66};
+  }
+  else if(sc.id==='spring'){ // 弹簧台秤：半圆大表盘（0 在左）
+    el('ellipse',{cx:150,cy:70,rx:100,ry:16,fill:'#e9ecf1',stroke:'#b7bdc8','stroke-width':2},svg);
+    el('rect',{x:142,y:82,width:16,height:26,fill:'#9aa3b0'},svg);
+    el('circle',{cx:150,cy:165,r:78,fill:'#f2f3f6',stroke:'#8a93a3','stroke-width':3},svg);
+    drawDialFace(svg,150,165,66,sc.range,'kg',500,1000,78,180,12,30);
+    needleEl = needle(svg,150,165,58);
+    setNeedle(needleEl,150,165,0,sc.range,180);
+    el('rect',{x:60,y:238,width:180,height:12,rx:6,fill:'#9aa3b0'},svg);
+    pan = {x:150,y:58};
+  }
+  else if(sc.id==='platform'){ // 电子台秤（数字 + 单位）
+    el('rect',{x:35,y:110,width:230,height:88,rx:16,fill:sc.body},svg);
+    el('rect',{x:45,y:84,width:210,height:26,rx:8,fill:'#c9ced8'},svg);
+    el('rect',{x:70,y:130,width:130,height:46,rx:6,fill:'#102018'},svg);
+    lcd = el('text',{x:120,y:163,'text-anchor':'middle','font-size':26,fill:'#7dff8a','font-family':'Consolas,monospace','font-weight':700},svg);
+    lcd.textContent = '0.00';
+    lcdUnit = el('text',{x:178,y:161,'text-anchor':'middle','font-size':14,fill:'#7dff8a','font-family':'Consolas,monospace','font-weight':700},svg);
+    lcdUnit.textContent = 'kg';
+    el('circle',{cx:232,cy:153,r:12,fill:'#f2c14e'},svg);
+    el('text',{x:232,y:158,'text-anchor':'middle','font-size':11,fill:'#5c4a12'},svg).textContent='开';
+    pan = {x:150,y:82};
+  }
+  else if(sc.id==='body'){ // 体重秤：扇形表盘窗（半圆 180°，0 在左、50 在右，25 在正上方，与课本插图一致）
+    el('rect',{x:40,y:120,width:220,height:96,rx:20,fill:sc.body},svg);
+    el('path',{d:'M70 120 q80 -78 160 0 z',fill:'#f5f6f8',stroke:'#7d8695','stroke-width':2},svg);
+    drawDialFace(svg,150,196,74,sc.range,'kg',2500,5000,78,180,11,-30);
+    // 盖住表盘圆的下半部分，只留扇形窗
+    el('rect',{x:40,y:202,width:220,height:60,fill:sc.body},svg);
+    needleEl = needle(svg,150,196,66);
+    setNeedle(needleEl,150,196,0,sc.range,180);
+    el('rect',{x:40,y:120,width:220,height:96,rx:20,fill:'none',stroke:'#7d8695','stroke-width':2},svg);
+    pan = {x:150,y:116};
+  }
+  return {svg, pan, needleEl, lcd, lcdUnit, dialRangeG:sc.range};
+}
+
+/* ============ 渲染 ============ */
+function renderPicker(){
+  const box = $('#scalePicker'); box.innerHTML='';
+  SCALES.forEach(sc=>{
+    const card = document.createElement('div');
+    card.className='scaleCard'+(selScale&&selScale.id===sc.id?' sel':'');
+    const mini = buildScaleSVG(sc).svg;
+    card.appendChild(mini);
+    const nm=document.createElement('div'); nm.className='nm'; nm.textContent=sc.name;
+    const rg=document.createElement('div'); rg.className='rg';
+    rg.textContent = `量程 ${sc.unit==='g'? sc.range+'g' : fmtKg(sc.range)+'kg'}`;
+    card.appendChild(nm); card.appendChild(rg);
+    card.addEventListener('click', ()=>selectScale(sc));
+    box.appendChild(card);
+  });
+}
+
+function renderStage(){
+  scaleWrap.innerHTML='';
+  readout.innerHTML='';
+  if(!selScale){
+    const p=document.createElement('div');
+    p.style.cssText='text-align:center;color:#6b7280;font-size:14px;padding:26px 0;';
+    p.textContent='① 在上方点选一个秤';
+    scaleWrap.appendChild(p);
+    return;
+  }
+  const built = buildScaleSVG(selScale);
+  scaleWrap.appendChild(built.svg);
+  // 物体已放上时重新摆上
+  if(objOnScale) placeObject(built, objOnScale);
+  hint.textContent = '第二步：从底部拖一个物体到秤上';
+}
+
+function placeObject(built, obj){
+  const svg = built.svg;
+  // 天平：把物体放进左盘组，随横梁一起倾斜
+  const host = built.pan.beamPan
+    ? svg.querySelector('#beam .panG[data-side="L"]')
+    : svg;
+  const t = el('text',{x:built.pan.x, y:built.pan.y,'text-anchor':'middle','font-size':32},host);
+  if(obj.icon.startsWith('<')){
+    t.remove();
+    const fo = el('foreignObject',{x:built.pan.x-17,y:built.pan.y-30,width:34,height:34},host);
+    const d = document.createElement('div'); d.style.cssText='width:34px;height:34px;'; d.innerHTML=obj.icon;
+    fo.appendChild(d);
+  } else t.textContent = obj.icon;
+}
+
+/* ============ 选择秤 ============ */
+function selectScale(sc){
+  if(busy && animId) clearTimeout(animId);
+  busy=false; objOnScale=null;
+  selScale=sc;
+  renderPicker(); renderStage();
+}
+
+/* ============ 称重流程 ============ */
+function startWeigh(obj){
+  if(!selScale){ toast('先在上方选一个秤，再拖物体过来'); return; }
+  if(busy) return;
+  const sc = selScale;
+  const built = buildScaleSVG(sc);
+  scaleWrap.innerHTML=''; scaleWrap.appendChild(built.svg);
+  objOnScale = obj;
+  placeObject(built, obj);
+  readout.innerHTML='';
+
+  // 超量程
+  if(obj.g > sc.range){ weighOverRange(sc, obj, built); return; }
+  // 太轻读不出
+  if(obj.g < sc.res){ weighTooLight(sc, obj, built); return; }
+
+  hint.textContent = '正在称重……';
+  if(sc.type==='balance') weighBalance(sc, obj, built);
+  else if(sc.type==='digital') weighDigital(sc, obj, built);
+  else weighDial(sc, obj, built);
+}
+
+function finishWeigh(sc, obj, val){
+  busy=false;
+  const valText = readingText(sc, val);
+  const conv = sc.unit==='g'
+    ? `= ${fmtKg(val)} 千克`
+    : `= ${Math.round(val*1000)} 克`;
+  if(sc.type==='dial'){
+    // 表盘秤：读数挑战——先自己读，再核对答案
+    readout.innerHTML =
+      `<div class="cv" style="font-size:14px;">指针停住了！先读出表盘示数，再点击按钮核对</div>`+
+      `<button id="revealBtn" class="revealBtn">显示答案</button>`;
+    hint.textContent = '读一读指针：指到哪个数了？读完后点"显示答案"核对';
+    $('#revealBtn').addEventListener('click', ()=>{
+      readout.innerHTML =
+        `<div class="big">${obj.name}：${valText}</div>`+
+        `<div class="cv">${valText} ${conv}　（1 千克 = 1000 克）</div>`;
+      hint.textContent = '你读对了吗？可再拖一个物体，或换一个秤试试';
+      addRecord(obj, sc, valText);
+    });
+  } else {
+    readout.innerHTML =
+      `<div class="big">${obj.name}：${valText}</div>`+
+      `<div class="cv">${valText} ${conv}　（1 千克 = 1000 克）</div>`;
+    hint.textContent = '已记录。可再拖一个物体，或换一个秤试试';
+    addRecord(obj, sc, valText);
+  }
+}
+
+function weighOverRange(sc, obj, built){
+  busy=true;
+  hint.textContent = '超出量程！';
+  if(built.needleEl){ // 针打到头并颤动
+    let t0=performance.now();
+    const anim = ()=>{
+      const t=(Date.now()-t0)/1000;
+      setNeedle(built.needleEl, ...needleCenter(sc), sc.range*(1+0.03*Math.sin(t*30)), sc.range, sc.sweep);
+      animId=setTimeout(anim,16);
+    };
+    animId=setTimeout(anim,16);
+  } else if(built.lcd){
+    built.lcd.textContent = 'Err';
+    built.lcd.setAttribute('fill','#ff6b6b');
+    if(built.lcdUnit) built.lcdUnit.setAttribute('fill','#ff6b6b');
+  }
+  readout.innerHTML = `<div class="warn">${obj.name}太重了，超出${sc.name}的量程（${sc.unit==='g'?sc.range+' g':fmtKg(sc.range)+' 千克'}）！</div>
+    <div class="cv">请换一个量程更大的秤</div>`;
+  setTimeout(()=>{
+    if(animId) clearTimeout(animId);
+    busy=false; objOnScale=null; renderStage();
+  }, 2400);
+}
+/* 各表盘秤针的圆心（与 buildScaleSVG 一致） */
+function needleCenter(sc){
+  if(sc.id==='pan') return [150,150];
+  if(sc.id==='spring') return [150,165];
+  if(sc.id==='body') return [150,196];
+  return [150,150];
+}
+
+function weighTooLight(sc, obj, built){
+  busy=true;
+  hint.textContent='正在称重……';
+  if(built.needleEl) setNeedle(built.needleEl, ...needleCenter(sc), 0, sc.range, sc.sweep);
+  if(built.lcd) built.lcd.textContent = sc.unit==='g' ? '0' : '0.00';
+  setTimeout(()=>{
+    readout.innerHTML =
+      `<div class="warn">读不出来！</div>
+       <div class="cv">${obj.name}太轻了，${sc.name}的读数是 0。请换更精密的秤（如天平、电子秤）</div>`;
+    hint.textContent='想一想：为什么轻的物体要用小量程、精密的秤？';
+    addRecord(obj, sc, '读不出（太轻）');
+    busy=false;
+  }, 1200);
+}
+
+/* 阻尼摆动指针称重（定时器驱动，兼容各类平板环境） */
+function weighDial(sc, obj, built){
+  busy=true;
+  const target = obj.g, rangeG = sc.range;
+  const [cx,cy] = needleCenter(sc);
+  const t0 = performance.now(), DUR = 2400;
+  const anim = ()=>{
+    const t = Math.min((performance.now()-t0)/DUR, 1);
+    const f = 1 - Math.exp(-4.2*t)*Math.cos(6.2*t); // 阻尼振荡，0→1
+    setNeedle(built.needleEl, cx, cy, target*f, rangeG, sc.sweep);
+    if(t<1) animId = setTimeout(anim, 16);
+    else{
+      setNeedle(built.needleEl, cx, cy, target, rangeG, sc.sweep);
+      finishWeigh(sc, obj, readingOf(sc, obj.g));
+    }
+  };
+  animId = setTimeout(anim, 16);
+}
+
+/* 数字屏滚动称重（定时器驱动，兼容各类平板环境） */
+function weighDigital(sc, obj, built){
+  busy=true;
+  const target = obj.g;
+  const t0 = performance.now(), DUR = 1700;
+  const anim = ()=>{
+    const t = Math.min((performance.now()-t0)/DUR, 1);
+    const prog = 1 - Math.exp(-5*t);
+    const noise = t<0.85 ? (Math.random()-0.5)*0.08*target*(1-t) : 0;
+    let v = Math.max(0, target*prog + noise);
+    let shown = readingOf(sc, v);
+    built.lcd.textContent = sc.unit==='g' ? Math.round(shown) : shown.toFixed(2);
+    if(t<1) animId=setTimeout(anim, 40);
+    else{
+      const finalV = readingOf(sc, obj.g);
+      built.lcd.textContent = sc.unit==='g' ? finalV : finalV.toFixed(2);
+      finishWeigh(sc, obj, finalV);
+    }
+  };
+  animId = setTimeout(anim, 40);
+}
+
+/* 天平自动配平 */
+function weighBalance(sc, obj, built){
+  busy=true;
+  const beam = built.svg.querySelector('#beam');
+  // 贪心选砝码
+  let rem=obj.g, plan=[];
+  BAL_WEIGHTS.forEach(w=>{ const c=Math.floor(rem/w); if(c>0){plan.push([w,c]); rem-=c*w;} });
+  // 左盘放物体 → 梁向左倾斜
+  const tilt = (deg)=> beam.setAttribute('transform', `rotate(${deg} 150 96)`);
+  tilt(10);
+  const steps=[];
+  plan.forEach(([w,c])=>{ for(let i=0;i<c;i++) steps.push(w); });
+  let i=0;
+  const stepMs = Math.max(420, 1400/Math.max(steps.length,1));
+  const addWeight = ()=>{
+    if(i < steps.length){
+      const w = steps[i];
+      const prog = (i+1)/steps.length;
+      // 砝码落入右盘
+      const g = el('g',{},beam);
+      const h = 8+Math.min(w/25,10);
+      el('rect',{x:230-9, y:140-h, width:18, height:h, rx:2, fill:'#565e6b'},g);
+      el('rect',{x:230-5, y:140-h-4, width:10, height:4, rx:1, fill:'#3d444f'},g);
+      const tx=el('text',{x:230,y:140-2,'text-anchor':'middle','font-size':7,fill:'#fff'},g);
+      tx.textContent = w>=1000? (w/1000)+'kg' : w+'g';
+      // 梁逐渐回正（带一点过冲）
+      const over = i===steps.length-1 ? -1.6 : 0;
+      tilt(10*(1-prog) + over);
+      i++;
+      setTimeout(addWeight, stepMs);
+    } else {
+      tilt(0);
+      setTimeout(()=> finishWeigh(sc, obj, obj.g), 500);
+    }
+  };
+  setTimeout(addWeight, 700);
+}
+
+/* ============ 记录表 ============ */
+function addRecord(obj, sc, valText){
+  records.push({name:obj.name, scale:sc.name, val:valText});
+  $('#recordCount').textContent = records.length;
+}
+function renderRecords(){
+  const body = $('#recordBody');
+  if(!records.length){ body.innerHTML = '<div id="recordEmpty">还没有称过东西，快去试一试吧！</div>'; return; }
+  let html = '<table><tr><th>#</th><th>物体</th><th>用的秤</th><th>读数</th></tr>';
+  records.forEach((r,i)=>{
+    html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${r.scale}</td><td><b>${r.val}</b></td></tr>`;
+  });
+  body.innerHTML = html + '</table>';
+}
+$('#recordBtn').addEventListener('click', ()=>{ renderRecords(); $('#recordPanel').hidden=false; });
+$('#recordClose').addEventListener('click', ()=>{ $('#recordPanel').hidden=true; });
+$('#recordPanel').addEventListener('click', e=>{ if(e.target.id==='recordPanel') $('#recordPanel').hidden=true; });
+
+/* ============ 拖拽（pointer events，支持触屏） ============ */
+function renderObjects(){
+  const bar = $('#objectsBar'); bar.innerHTML='';
+  OBJECTS.forEach(obj=>{
+    const chip = document.createElement('div');
+    chip.className='objChip'; chip.dataset.oid=obj.id;
+    chip.innerHTML = `<div class="ic">${obj.icon}</div><div class="nm">${obj.name}</div>`;
+    chip.addEventListener('pointerdown', e=>beginDrag(e, obj, chip));
+    bar.appendChild(chip);
+  });
+}
+function beginDrag(e, obj, chip){
+  if(busy) return;
+  e.preventDefault();
+  const ghost = document.createElement('div');
+  ghost.className='dragGhost';
+  if(obj.icon.startsWith('<')){
+    ghost.innerHTML = `<div style="width:44px;height:44px;">${obj.icon}</div>`;
+    ghost.firstElementChild.style.cssText='width:44px;height:44px;';
+  } else ghost.textContent = obj.icon;
+  document.body.appendChild(ghost);
+  chip.classList.add('dragging');
+  const move = ev=>{
+    ghost.style.left = ev.clientX+'px';
+    ghost.style.top = ev.clientY+'px';
+  };
+  move(e);
+  const up = ev=>{
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointercancel', up);
+    ghost.remove(); chip.classList.remove('dragging');
+    const stage = $('#stage').getBoundingClientRect();
+    const inStage = ev.clientX>=stage.left && ev.clientX<=stage.right
+                 && ev.clientY>=stage.top && ev.clientY<=stage.bottom;
+    if(inStage) startWeigh(obj);
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', up);
+}
+
+/* ============ 启动 ============ */
+renderPicker();
+renderStage();
+renderObjects();
+</script>
+</body>
+</html>
