@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>吨的直觉 · 卡车过磅 3D 实验室</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#0d1117;
+    font-family:'Microsoft YaHei','PingFang SC',sans-serif;touch-action:manipulation;user-select:none}
+  #stage{position:fixed;inset:0}
+  #stage canvas{display:block}
+
+  /* ---------- 左上：标题与进度 ---------- */
+  #topbar{position:fixed;top:10px;left:12px;z-index:20;color:#fff;pointer-events:none}
+  #title{font-size:20px;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,.8)}
+  #title small{font-size:12px;font-weight:400;opacity:.85;margin-left:8px}
+  #progressChip{display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;
+    background:rgba(10,16,24,.72);border:1px solid rgba(255,255,255,.25);font-size:14px;color:#ffe9a8}
+  #vehInfo{margin-top:6px;font-size:14px;color:#e8f1fa;text-shadow:0 1px 4px rgba(0,0,0,.9)}
+
+  /* ---------- 右上：LED 称重显示器（核心，永远高亮） ---------- */
+  #hud{position:fixed;top:10px;right:12px;z-index:20;display:flex;flex-direction:column;gap:8px;width:320px}
+  #ledPanel{background:linear-gradient(180deg,#2a2f36,#14181d);border:2px solid #3d444d;border-radius:14px;
+    padding:10px 14px 12px;box-shadow:0 8px 30px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.12)}
+  .led-title{color:#9fb3c8;font-size:13px;letter-spacing:6px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  .led-range{font-size:10px;letter-spacing:0;opacity:.7;font-weight:400}
+  .led-screen{margin-top:8px;background:radial-gradient(ellipse at center,#1c0808 0%,#0d0303 80%);
+    border:2px solid #000;border-radius:10px;padding:6px 12px;text-align:right;
+    box-shadow:inset 0 0 24px rgba(255,40,30,.25)}
+  #ledValue{font-family:Consolas,'Courier New',monospace;font-size:56px;font-weight:700;color:#ff3226;
+    letter-spacing:2px;text-shadow:0 0 6px rgba(255,60,40,.9),0 0 22px rgba(255,40,20,.55);line-height:1.05}
+  .led-unit{font-family:Consolas,monospace;font-size:22px;color:#ff6a5e;margin-left:8px;font-weight:700}
+  .led-screen.dim #ledValue{color:#5a1410;text-shadow:none}
+  #ledTon{margin-top:6px;text-align:center;font-size:22px;font-weight:700;color:#ffd873;
+    text-shadow:0 0 10px rgba(255,200,80,.4);min-height:28px}
+  #ledStatus{margin-top:4px;text-align:center;font-size:15px;font-weight:700;border-radius:8px;padding:4px 0}
+  .st-idle{background:#22282f;color:#8a97a5}
+  .st-run{background:#4a3208;color:#ffc23d;animation:blink 1s steps(2) infinite}
+  .st-ok{background:#0e3d1c;color:#4dff88;box-shadow:0 0 14px rgba(60,255,120,.35)}
+  @keyframes blink{50%{opacity:.45}}
+  #btnMute{margin-top:8px;width:100%;padding:6px;border-radius:8px;border:1px solid #4a525c;
+    background:#1d232a;color:#aebccb;font-size:13px;cursor:pointer}
+  #btnMute:active{background:#2a3340}
+
+  /* ---------- 右下：过磅记录 ---------- */
+  #recPanel{background:rgba(10,16,24,.78);border:1px solid rgba(255,255,255,.18);border-radius:12px;
+    padding:8px 10px;backdrop-filter:blur(4px);max-height:38vh;overflow:auto}
+  .rec-title{color:#ffe9a8;font-size:13px;font-weight:700;margin-bottom:4px;letter-spacing:2px}
+  #recPanel table{width:100%;border-collapse:collapse;font-size:12.5px;color:#dbe6f1}
+  #recPanel th{color:#8fa4b8;font-weight:400;text-align:left;padding:2px 4px;border-bottom:1px solid rgba(255,255,255,.2)}
+  #recPanel th.num,.sum-card th.num{text-align:right}
+  #recPanel td{padding:3px 4px;border-bottom:1px dashed rgba(255,255,255,.1)}
+  #recPanel tr.total td{color:#ffd873;font-weight:700;border-top:2px solid rgba(255,216,115,.5)}
+  #recPanel td.num{font-family:Consolas,monospace;text-align:right}
+
+  /* ---------- 底部：操作坞 ---------- */
+  #dock{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:20;width:min(920px,94vw);
+    display:flex;flex-direction:column;align-items:center;gap:8px}
+  #hint{background:rgba(10,16,24,.78);border-left:4px solid #ffd873;color:#f5f8fb;font-size:15px;
+    padding:7px 16px;border-radius:8px;backdrop-filter:blur(4px);max-width:100%;text-align:center}
+  #steps{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  #steps button{padding:13px 22px;font-size:17px;font-weight:700;border-radius:12px;border:none;cursor:pointer;
+    color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.45);transition:transform .08s, filter .15s;font-family:inherit}
+  #steps button:not(:disabled):hover{filter:brightness(1.12)}
+  #steps button:not(:disabled):active{transform:scale(.96)}
+  #steps button:disabled{background:#2a3138 !important;color:#5c6672;cursor:not-allowed;box-shadow:none}
+  #btnEnter:not(:disabled){background:linear-gradient(180deg,#2f81f7,#1f5fc0)}
+  #btnLeave:not(:disabled){background:linear-gradient(180deg,#9e6a03,#7a5200)}
+  #btnNext:not(:disabled){background:linear-gradient(180deg,#8250df,#6639ba)}
+
+  /* ---------- 确认读数后的知识卡 ---------- */
+  #toast{background:linear-gradient(180deg,rgba(20,32,20,.94),rgba(10,20,12,.94));border:1px solid #2ea043;
+    border-radius:14px;padding:12px 20px;color:#eafff0;text-align:center;backdrop-filter:blur(6px);
+    box-shadow:0 10px 36px rgba(0,0,0,.6)}
+  #toast.hidden,#summary.hidden{display:none}
+  #toastTitle{font-size:24px;font-weight:800;color:#7dff9e;letter-spacing:1px}
+  #toastFact{font-size:15px;margin-top:4px;color:#cdeed6}
+  #toastWhy{font-size:14px;margin-top:4px;color:#ffd873}
+
+  /* ---------- 结束汇总 ---------- */
+  #summary{position:fixed;inset:0;z-index:40;background:rgba(5,10,16,.55);display:flex;
+    align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+  .sum-card{background:#131a22;border:2px solid #3d4a58;border-radius:18px;padding:22px 28px;
+    width:min(560px,92vw);max-height:88vh;overflow:auto;color:#e8f1fa;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+  .sum-card h2{margin:0 0 10px;font-size:22px;color:#ffd873}
+  .sum-card table{width:100%;border-collapse:collapse;font-size:14px}
+  .sum-card th{color:#8fa4b8;font-weight:400;text-align:left;padding:4px 6px;border-bottom:1px solid #3d4a58}
+  .sum-card td{padding:5px 6px;border-bottom:1px dashed rgba(255,255,255,.12)}
+  .sum-card td.num{font-family:Consolas,monospace;text-align:right}
+  .sum-card tr.total td{color:#ffd873;font-weight:800;border-top:2px solid rgba(255,216,115,.5);font-size:15px}
+  #sumText{font-size:15px;line-height:1.7;color:#cdeed6;margin:12px 0}
+  #btnRestart{width:100%;padding:14px;font-size:18px;font-weight:700;border:none;border-radius:12px;
+    background:linear-gradient(180deg,#8250df,#6639ba);color:#fff;cursor:pointer;font-family:inherit}
+
+  #glFail{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    color:#fff;font-size:18px;background:#0d1117;text-align:center;padding:30px}
+
+  @media (max-width:860px){
+    #hud{width:250px}
+    #ledValue{font-size:40px}
+    #toastTitle{font-size:19px}
+    #recPanel{max-height:24vh}
+    #steps button{padding:11px 14px;font-size:15px}
+    #title{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="topbar">
+  <div id="title">吨的直觉 · 卡车过磅 3D 实验室<small>1000 千克 = 1 吨</small></div>
+  <div id="progressChip">准备中…</div>
+  <div id="vehInfo"></div>
+</div>
+
+<div id="hud">
+  <div id="ledPanel">
+    <div class="led-title">电子汽车衡<span class="led-range">量程 100t · 分度 10kg</span></div>
+    <div class="led-screen dim" id="ledScreen"><span id="ledValue">0</span><span class="led-unit">kg</span></div>
+    <div id="ledTon">? 吨</div>
+    <div id="ledStatus" class="st-idle">● 等待车辆上磅</div>
+    <button id="btnMute">🔊 声音：开</button>
+  </div>
+  <div id="recPanel">
+    <div class="rec-title">📋 过磅记录</div>
+    <table>
+      <thead><tr><th>#</th><th>车辆</th><th class="num">千克</th><th class="num">吨</th></tr></thead>
+      <tbody id="recBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="dock">
+  <div id="toast" class="hidden">
+    <div id="toastTitle"></div>
+    <div id="toastFact"></div>
+    <div id="toastWhy"></div>
+  </div>
+  <div id="hint">第 1 步：点击「车辆进场 · 开上磅台」，看清车是怎样慢慢开上磅台的</div>
+  <div id="steps">
+    <button id="btnEnter">🚚 车辆进场 · 开上磅台</button>
+    <button id="btnLeave" disabled>💨 驶离磅台</button>
+    <button id="btnNext" disabled>➡️ 下一辆车</button>
+  </div>
+</div>
+
+<div id="summary" class="hidden">
+  <div class="sum-card">
+    <h2>🏁 今日过磅汇总</h2>
+    <table>
+      <thead><tr><th>#</th><th>车辆</th><th>情况</th><th class="num">千克</th><th class="num">吨</th></tr></thead>
+      <tbody id="sumBody"></tbody>
+    </table>
+    <p id="sumText"></p>
+    <button id="btnRestart">🔁 再过一遍</button>
+  </div>
+</div>
+
+<div id="glFail">这台设备的浏览器不支持 3D 渲染（WebGL）。<br>请换用新版 Chrome / Edge，或在设置里开启硬件加速。</div>
+
+<script src="./three.min.js"></script>
+<script>
+if (typeof THREE === 'undefined') {
+  document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>');
+}
+</script>
+<script>
+'use strict';
+/* ================================================================
+   吨的直觉 · 卡车过磅 3D 实验室
+   教学目标：通过完整的过磅流程，积累「大质量」经验，
+   感受用「吨」作单位的必要性（1000 千克 = 1 吨）。
+   ================================================================ */
+
+/* ---------------- 车队数据（真实重量范围，整千或整五百千克） ---------------- */
+const FLEET = [
+  { type:'truck',  name:'载货卡车',   state:'空载',   kg: 9000,  color:0x2f6fb0 },
+  { type:'truck',  name:'载货卡车',   state:'半载',   kg:15000,  color:0xb03a2e },
+  { type:'truck',  name:'载货卡车',   state:'满载',   kg:25000,  color:0x1e8449 },
+  { type:'truck',  name:'载货卡车',   state:'重载',   kg:30000,  color:0x7d3c98 },
+  { type:'bus',    name:'长途大巴车', state:'载客出行', kg:12000, color:0xd68910 },
+  { type:'bus',    name:'长途大巴车', state:'载客出行', kg:13500, color:0x148f77 },
+  { type:'crane',  name:'汽车吊车',   state:'中型吊车', kg:25000, color:0xb9770e },
+  { type:'crane',  name:'汽车吊车',   state:'大型吊车', kg:35000, color:0xa04000 },
+  { type:'mixer',  name:'搅拌车',     state:'空罐',   kg:15000,  color:0x2c3e50 },
+  { type:'mixer',  name:'搅拌车',     state:'满载混凝土', kg:25000, color:0x616a6b },
+];
+/* 数据自检：重量必须是整五百的倍数、共 10 辆 */
+FLEET.forEach(function(v,i){
+  if (v.kg % 500 !== 0) console.error('数据错误: 第'+(i+1)+'辆 '+v.name+' 重量 '+v.kg+' 不是整五百千克');
+  if (v.kg < 3000 || v.kg > 40000) console.error('数据警告: 第'+(i+1)+'辆 重量超出常见范围');
+});
+
+const KG_PER_KID = 30;   // 一个三年级同学约 30 千克
+const KG_PER_ELEPHANT = 6000;
+
+function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+function tonText(kg){
+  if (kg % 1000 === 0) return fmt(kg/1000) + ' 吨';
+  return (kg/1000).toFixed(1) + ' 吨（' + Math.floor(kg/1000) + ' 吨 ' + (kg%1000) + ' 千克）';
+}
+
+/* ---------------- DOM ---------------- */
+var $ = function(id){ return document.getElementById(id); };
+var ledValue=$('ledValue'), ledTon=$('ledTon'), ledStatus=$('ledStatus'), ledScreen=$('ledScreen');
+var btnEnter=$('btnEnter'), btnLeave=$('btnLeave'), btnNext=$('btnNext'),
+    btnMute=$('btnMute'), btnRestart=$('btnRestart');
+var hint=$('hint'), progressChip=$('progressChip'), vehInfo=$('vehInfo');
+var toast=$('toast'), toastTitle=$('toastTitle'), toastFact=$('toastFact'), toastWhy=$('toastWhy');
+var recBody=$('recBody'), sumBody=$('sumBody'), summary=$('summary'), sumText=$('sumText');
+
+function setButtons(o){
+  btnEnter.disabled = !o.enter;
+  btnLeave.disabled = !o.leave; btnNext.disabled = !o.next;
+}
+function setHint(t){ hint.textContent = t; }
+function setStatus(cls, t){ ledStatus.className = cls; ledStatus.textContent = t; }
+
+/* ---------------- 音效（WebAudio 合成，无外部素材） ---------------- */
+var AC=null, master=null, noiseBuf=null, engine=null, muted=false;
+function ensureAudio(){
+  try{
+    if(!AC){
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) return;
+      AC = new Ctx();
+      master = AC.createGain(); master.gain.value = muted?0:0.9; master.connect(AC.destination);
+    }
+    if(AC.state==='suspended') AC.resume();
+  }catch(e){}
+}
+function makeNoise(){
+  var len = AC.sampleRate*2, buf = AC.createBuffer(1,len,AC.sampleRate), d = buf.getChannelData(0), last=0;
+  for(var i=0;i<len;i++){ var w=Math.random()*2-1; last=(last+0.02*w)/1.02; d[i]=last*3.2; }
+  return buf;
+}
+function startEngine(pitch){
+  ensureAudio(); if(!AC) return;
+  stopEngine(0.12);
+  if(!noiseBuf) noiseBuf = makeNoise();
+  var src=AC.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
+  var filt=AC.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=220; filt.Q.value=0.8;
+  var g=AC.createGain(); g.gain.value=0.0001;
+  src.connect(filt); filt.connect(g); g.connect(master);
+  var osc=AC.createOscillator(); osc.type='sawtooth'; osc.frequency.value=50*pitch;
+  var og=AC.createGain(); og.gain.value=0.0001;
+  osc.connect(og); og.connect(master);
+  src.start(); osc.start();
+  var t=AC.currentTime;
+  g.gain.linearRampToValueAtTime(0.14, t+0.5);
+  og.gain.linearRampToValueAtTime(0.05, t+0.5);
+  engine={src:src,osc:osc,filt:filt,g:g,og:og,pitch:pitch};
+}
+function engineSet(v){
+  if(!engine) return;
+  engine.filt.frequency.value = 200 + v*950;
+  engine.g.gain.value = 0.08 + v*0.14;
+  engine.osc.frequency.value = (44 + v*72) * engine.pitch;
+  engine.og.gain.value = 0.025 + v*0.055;
+}
+function engineIdle(){
+  if(!engine || !AC) return;
+  var t=AC.currentTime;
+  engine.g.gain.linearRampToValueAtTime(0.05, t+0.6);
+  engine.og.gain.linearRampToValueAtTime(0.02, t+0.6);
+}
+function stopEngine(ramp){
+  if(!engine) return;
+  var e=engine; engine=null;
+  if(!AC){ return; }
+  var t=AC.currentTime, r=ramp||0.6;
+  try{
+    e.g.gain.linearRampToValueAtTime(0.0001, t+r);
+    e.og.gain.linearRampToValueAtTime(0.0001, t+r);
+    setTimeout(function(){ try{ e.src.stop(); e.osc.stop(); }catch(_){} }, (r+0.3)*1000);
+  }catch(err){ engine=null; }
+}
+function hiss(){
+  ensureAudio(); if(!AC) return;
+  if(!noiseBuf) noiseBuf = makeNoise();
+  var src=AC.createBufferSource(); src.buffer=noiseBuf;
+  var f=AC.createBiquadFilter(); f.type='highpass'; f.frequency.value=2200;
+  var g=AC.createGain(); g.gain.value=0.12;
+  src.connect(f); f.connect(g); g.connect(master);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+0.7);
+  src.start(); src.stop(AC.currentTime+0.75);
+}
+function beep(){
+  ensureAudio(); if(!AC) return;
+  [0,0.22].forEach(function(off){
+    var o=AC.createOscillator(); o.type='sine'; o.frequency.value=920;
+    var g=AC.createGain(); g.gain.value=0.0001;
+    o.connect(g); g.connect(master);
+    var t=AC.currentTime+off;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.25,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    o.start(t); o.stop(t+0.2);
+  });
+}
+function horn(){
+  ensureAudio(); if(!AC) return;
+  [370,466].forEach(function(fq){
+    var o=AC.createOscillator(); o.type='square'; o.frequency.value=fq;
+    var g=AC.createGain(); g.gain.value=0.0001;
+    o.connect(g); g.connect(master);
+    var t=AC.currentTime;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(0.08,t+0.05);
+    g.gain.setValueAtTime(0.08,t+0.45);
+    g.gain.linearRampToValueAtTime(0.0001,t+0.55);
+    o.start(t); o.stop(t+0.6);
+  });
+}
+btnMute.addEventListener('click', function(){
+  muted=!muted; ensureAudio();
+  if(master) master.gain.value = muted?0:0.9;
+  btnMute.textContent = muted ? '🔇 声音：关' : '🔊 声音：开';
+});
+
+/* ---------------- Three.js 场景 ---------------- */
+var renderer, scene, camera, sunLight;
+var vehicleRoot=null, wheels=[], drumSpin=null, drumMesh=null, bodyGroup=null;
+var SCALE = 1; // 1 单位 = 1 米
+
+function texCanvas(w,h,draw){
+  var c=document.createElement('canvas'); c.width=w; c.height=h;
+  draw(c.getContext('2d'),w,h);
+  var t=new THREE.CanvasTexture(c);
+  t.anisotropy=4;
+  return t;
+}
+
+function initThree(){
+  try{
+    renderer = new THREE.WebGLRenderer({antialias:true});
+  }catch(e){
+    $('glFail').style.display='flex';
+    return false;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.92;
+  $('stage').appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  var skyTex = texCanvas(16,256,function(ctx,w,h){
+    var g=ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'#3d78b5'); g.addColorStop(0.55,'#8ec3e0'); g.addColorStop(1,'#dceef2');
+    ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  });
+  scene.background = skyTex;
+  scene.fog = new THREE.Fog(0xbcd6e4, 70, 190);
+
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 400);
+  camera.position.set(0, 7.5, 22);
+  camera.lookAt(0, 2.2, 0);
+
+  var hemi = new THREE.HemisphereLight(0xcfe6ff, 0x3c382f, 0.55);
+  scene.add(hemi);
+  sunLight = new THREE.DirectionalLight(0xfff2dc, 1.0);
+  sunLight.position.set(24, 34, 18);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.camera.left=-30; sunLight.shadow.camera.right=30;
+  sunLight.shadow.camera.top=30; sunLight.shadow.camera.bottom=-30;
+  sunLight.shadow.camera.far=120;
+  sunLight.shadow.bias = -0.0004;
+  scene.add(sunLight);
+
+  buildEnvironment();
+  window.addEventListener('resize', onResize);
+  return true;
+}
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* ---------------- 环境地面 · 磅台 · 背景 ---------------- */
+function buildEnvironment(){
+  // 沥青地面
+  var asphalt = texCanvas(256,256,function(ctx,w,h){
+    ctx.fillStyle='#26292e'; ctx.fillRect(0,0,w,h);
+    for(var i=0;i<2600;i++){
+      var g=24+Math.random()*30;
+      ctx.fillStyle='rgb('+g+','+g+','+(g+3)+')';
+      ctx.fillRect(Math.random()*w, Math.random()*h, 1.6, 1.6);
+    }
+  });
+  asphalt.wrapS=asphalt.wrapT=THREE.RepeatWrapping; asphalt.repeat.set(24,9);
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(320,120),
+    new THREE.MeshStandardMaterial({map:asphalt, roughness:0.95, metalness:0.02})
+  );
+  ground.rotation.x=-Math.PI/2; ground.position.y=0; ground.receiveShadow=true;
+  scene.add(ground);
+
+  // 车道标线（磅台两侧虚线）
+  var lineMat=new THREE.MeshStandardMaterial({color:0xe8e8e8, roughness:0.7});
+  for(var i=-7;i<=7;i++){
+    if(Math.abs(i)<2) continue;
+    var dash=new THREE.Mesh(new THREE.PlaneGeometry(2.4,0.16), lineMat);
+    dash.rotation.x=-Math.PI/2; dash.position.set(i*3.1, 0.012, 3.4); dash.receiveShadow=false;
+    scene.add(dash);
+  }
+
+  // 磅台（钢制秤台，微微凸起）
+  var steelTex = texCanvas(256,256,function(ctx,w,h){
+    ctx.fillStyle='#6d747d'; ctx.fillRect(0,0,w,h);
+    for(var i=0;i<900;i++){
+      var g=95+Math.random()*40;
+      ctx.fillStyle='rgba('+g+','+g+','+(g+8)+',0.5)';
+      ctx.fillRect(Math.random()*w, Math.random()*h, 3, 3);
+    }
+    ctx.strokeStyle='rgba(40,44,50,.6)'; ctx.lineWidth=2;
+    for(var x=0;x<=w;x+=32){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  });
+  steelTex.wrapS=steelTex.wrapT=THREE.RepeatWrapping; steelTex.repeat.set(5,1.4);
+  var plat = new THREE.Mesh(
+    new THREE.BoxGeometry(20, 0.32, 4.6),
+    new THREE.MeshStandardMaterial({map:steelTex, roughness:0.55, metalness:0.65})
+  );
+  plat.position.y=0.16; plat.receiveShadow=true; plat.castShadow=true;
+  scene.add(plat);
+
+  // 磅台两端黄黑警示斜坡条
+  var hzTex = texCanvas(128,32,function(ctx,w,h){
+    ctx.fillStyle='#e6c229'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#151515';
+    for(var x=-32;x<w+32;x+=32){
+      ctx.beginPath(); ctx.moveTo(x,h); ctx.lineTo(x+16,0); ctx.lineTo(x+32,0); ctx.lineTo(x+16,h); ctx.fill();
+    }
+  });
+  hzTex.wrapS=THREE.RepeatWrapping; hzTex.repeat.set(4,1);
+  var hzMat=new THREE.MeshStandardMaterial({map:hzTex, roughness:0.6, metalness:0.3});
+  [-10.35,10.35].forEach(function(px){
+    var strip=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.3,4.6), hzMat);
+    strip.position.set(px,0.15,0); strip.castShadow=true;
+    scene.add(strip);
+  });
+
+  // 地磅限重牌
+  var signTex = texCanvas(256,160,function(ctx,w,h){
+    ctx.fillStyle='#f5f0e6'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#2255aa'; ctx.lineWidth=10; ctx.strokeRect(6,6,w-12,h-12);
+    ctx.fillStyle='#c0392b'; ctx.font='bold 46px Microsoft YaHei'; ctx.textAlign='center';
+    ctx.fillText('地磅区', w/2, 58);
+    ctx.fillStyle='#2255aa'; ctx.font='bold 40px Microsoft YaHei';
+    ctx.fillText('限重 60 吨', w/2, 116);
+  });
+  var sign=new THREE.Mesh(new THREE.PlaneGeometry(3.4,2.1),
+    new THREE.MeshStandardMaterial({map:signTex, roughness:0.8, side:THREE.DoubleSide}));
+  sign.position.set(-12.2, 2.6, -3.2); sign.rotation.y=0.35;
+  scene.add(sign);
+  var pole=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,2.7,10),
+    new THREE.MeshStandardMaterial({color:0x8b9199, metalness:0.7, roughness:0.4}));
+  pole.position.set(-12.2, 1.35, -3.62);   // 立杆在牌面后方，不遮挡文字
+  pole.castShadow=true;
+  scene.add(pole);
+
+  // 磅房（收费小屋）
+  var hut=new THREE.Group();
+  var wallMat=new THREE.MeshStandardMaterial({color:0xd8cfc0, roughness:0.9});
+  var hutBody=new THREE.Mesh(new THREE.BoxGeometry(4,2.6,3), wallMat);
+  hutBody.position.y=1.3; hutBody.castShadow=true; hutBody.receiveShadow=true;
+  hut.add(hutBody);
+  var roof=new THREE.Mesh(new THREE.BoxGeometry(4.5,0.35,3.5),
+    new THREE.MeshStandardMaterial({color:0x8a4b32, roughness:0.85}));
+  roof.position.y=2.78; roof.castShadow=true; hut.add(roof);
+  var winTex = texCanvas(128,96,function(ctx,w,h){
+    ctx.fillStyle='#ffd873'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#3a3f45'; ctx.lineWidth=6; ctx.strokeRect(3,3,w-6,h-6);
+  });
+  var win=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.1),
+    new THREE.MeshStandardMaterial({map:winTex, emissive:0xffca50, emissiveIntensity:0.55}));
+  win.position.set(-2.01,1.5,0); win.rotation.y=-Math.PI/2;
+  hut.add(win);
+  hut.position.set(13.5, 0, -5.5); hut.rotation.y=0.3;
+  scene.add(hut);
+
+  // 背景城市剪影 + 树
+  var winGrid = texCanvas(128,128,function(ctx,w,h){
+    ctx.fillStyle='#5d7182'; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#233240';
+    for(var y=12;y<h-8;y+=28){ for(var x=10;x<w-8;x+=24){ ctx.fillRect(x,y,14,16); } }
+  });
+  winGrid.wrapS=winGrid.wrapT=THREE.RepeatWrapping;
+  var bMat=new THREE.MeshStandardMaterial({map:winGrid, roughness:0.9});
+  var bMat2=new THREE.MeshStandardMaterial({map:winGrid, color:0x9fb8c8, roughness:0.9});
+  bMat.map.repeat.set(2.4,1.6); bMat2.map.repeat.set(2,1.2);
+  var blocks=[[-34,10,14,7],[-24,16,10,11],[-12,9,16,5],[12,12,12,8],[24,18,9,13],[36,10,14,6]];
+  blocks.forEach(function(b,i){
+    var m=new THREE.Mesh(new THREE.BoxGeometry(b[1],b[2],b[3]), i%2?bMat:bMat2);
+    m.position.set(b[0], b[2]/2, -26-Math.random()*6);
+    scene.add(m);
+  });
+  var trunkMat=new THREE.MeshStandardMaterial({color:0x6b4a2f, roughness:0.95});
+  var leafMat=new THREE.MeshStandardMaterial({color:0x3f7d3a, roughness:0.95});
+  [[-16,-6],[16,-6.5],[-9,-7],[20,-5.5],[-27,-6]].forEach(function(p){
+    var g=new THREE.Group();
+    var trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.18,1.4,8), trunkMat);
+    trunk.position.y=0.7; trunk.castShadow=true; g.add(trunk);
+    var crown=new THREE.Mesh(new THREE.SphereGeometry(1.15,10,9), leafMat);
+    crown.position.y=2.1; crown.scale.y=1.2; crown.castShadow=true; g.add(crown);
+    g.position.set(p[0],0,p[1]);
+    scene.add(g);
+  });
+  // 交通锥
+  var coneMat=new THREE.MeshStandardMaterial({color:0xe8611c, roughness:0.6});
+  [[-8.5,3.1],[8.5,3.1]].forEach(function(p){
+    var cone=new THREE.Mesh(new THREE.ConeGeometry(0.22,0.55,10), coneMat);
+    cone.position.set(p[0],0.28,p[1]); cone.castShadow=true;
+    scene.add(cone);
+  });
+}
+
+/* ---------------- 车辆建模 ---------------- */
+function mkMat(color, metal, rough){
+  return new THREE.MeshStandardMaterial({color:color, metalness:metal==null?0.55:metal, roughness:rough==null?0.38:rough});
+}
+var glassMat = new THREE.MeshStandardMaterial({color:0x18262e, metalness:0.92, roughness:0.1});
+var tireMat  = new THREE.MeshStandardMaterial({color:0x141414, roughness:0.95});
+var rimMat   = new THREE.MeshStandardMaterial({color:0xc4c9d1, metalness:0.88, roughness:0.28});
+var darkMat  = new THREE.MeshStandardMaterial({color:0x22262b, roughness:0.6, metalness:0.4});
+
+function addBox(group, w,h,d, mat, x,y,z, castShadow){
+  var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z);
+  m.castShadow = castShadow!==false;
+  group.add(m);
+  return m;
+}
+function addWheel(group, x, z, r, store){
+  var wg=new THREE.Group();
+  var tire=new THREE.Mesh(new THREE.CylinderGeometry(r,r,0.34,22), tireMat);
+  tire.rotation.x=Math.PI/2; tire.castShadow=true;
+  wg.add(tire);
+  var rim=new THREE.Mesh(new THREE.CylinderGeometry(r*0.55,r*0.55,0.36,14), rimMat);
+  rim.rotation.x=Math.PI/2; wg.add(rim);
+  var spoke=new THREE.Mesh(new THREE.BoxGeometry(r*0.95,0.08,0.37), rimMat);
+  wg.add(spoke);
+  var spoke2=new THREE.Mesh(new THREE.BoxGeometry(0.08,r*0.95,0.37), rimMat);
+  wg.add(spoke2);
+  wg.position.set(x, r, z);
+  group.add(wg);
+  store.push(wg);
+  return wg;
+}
+function sideTextMat(color, bandText, subText){
+  // 车厢侧面贴图：底色 + 白色横带 + 大字
+  var t=texCanvas(512,192,function(ctx,w,h){
+    ctx.fillStyle='#'+('000000'+color.toString(16)).slice(-6);
+    ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='rgba(255,255,255,.22)';
+    for(var x=18;x<w;x+=52){ ctx.fillRect(x,10,10,h-20); }
+    ctx.fillStyle='#f2f2f2'; ctx.fillRect(0,h*0.42,w,h*0.3);
+    ctx.fillStyle='#b03a2e'; ctx.font='bold 44px Microsoft YaHei'; ctx.textAlign='center';
+    ctx.fillText(bandText, w/2, h*0.65);
+    if(subText){
+      ctx.fillStyle='#f5f5f5'; ctx.font='bold 30px Microsoft YaHei';
+      ctx.fillText(subText, w/2, h*0.3);
+    }
+  });
+  return new THREE.MeshStandardMaterial({map:t, roughness:0.5, metalness:0.35});
+}
+
+function buildTruck(v){
+  var g=new THREE.Group(), wheels=[];
+  addBox(g, 8.8,0.34,1.7, darkMat, -0.1,0.72,0);              // 底盘
+  var boxMat=sideTextMat(v.color,'严禁超载','城市货运');
+  var box=new THREE.Mesh(new THREE.BoxGeometry(6.3,2.5,2.4),[
+    boxMat, boxMat, mkMat(v.color,0.4,0.5), mkMat(v.color,0.4,0.5), boxMat, boxMat
+  ]);
+  box.position.set(-1.35,2.15,0); box.castShadow=true; g.add(box);
+  // 驾驶室
+  var cab=new THREE.Group();
+  addBox(cab, 2.2,2.1,2.4, mkMat(v.color), 0,0,0);
+  addBox(cab, 0.12,0.95,1.9, glassMat, 1.06,0.42,0);          // 前风挡
+  addBox(cab, 0.9,0.6,0.06, glassMat, -0.2,0.42,1.21);        // 侧窗
+  addBox(cab, 0.9,0.6,0.06, glassMat, -0.2,0.42,-1.21);
+  addBox(cab, 2.4,0.42,2.5, darkMat, 0.1,-1.0,0);             // 保险杠
+  var lamp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.16,0.34),
+    new THREE.MeshStandardMaterial({color:0xffe9a8, emissive:0xffdf80, emissiveIntensity:0.9}));
+  lamp.position.set(1.22,-0.85,0.8); cab.add(lamp);
+  var lamp2=lamp.clone(); lamp2.position.z=-0.8; cab.add(lamp2);
+  addBox(cab, 0.05,0.34,0.05, darkMat, 1.02,0.75,1.14);       // 后视镜
+  cab.position.set(3.35,1.9,0);
+  g.add(cab);
+  addBox(g, 1.5,0.44,0.9, mkMat(0x9aa1a9,0.75,0.3), -0.4,0.62,0);  // 油箱
+  addWheel(g, 3.4, 1.0, 0.55, wheels); addWheel(g, 3.4, -1.0, 0.55, wheels);
+  addWheel(g, -2.5, 1.0, 0.55, wheels); addWheel(g, -2.5, -1.0, 0.55, wheels);
+  addWheel(g, -3.8, 1.0, 0.55, wheels); addWheel(g, -3.8, -1.0, 0.55, wheels);
+  return {group:g, wheels:wheels, len:9.2, pitch:1.0};
+}
+
+function buildBus(v){
+  var g=new THREE.Group(), wheels=[];
+  var body=mkMat(v.color,0.55,0.32);
+  addBox(g, 11,2.9,2.5, body, 0,1.95,0);
+  addBox(g, 10.3,0.8,2.54, glassMat, -0.25,2.58,0);           // 侧窗带
+  for(var wi=0; wi<6; wi++){                                   // 窗柱分隔
+    addBox(g, 0.22,0.85,2.56, mkMat(v.color,0.55,0.32), -4.3+wi*1.65, 2.58, 0);
+  }
+  addBox(g, 0.12,1.4,2.1, glassMat, 5.5,2.45,0);              // 前风挡
+  addBox(g, 0.1,1.1,2.0, glassMat, -5.5,2.5,0);               // 后窗
+  addBox(g, 11,0.28,2.52, mkMat(0xf3ead6,0.3,0.6), 0,1.1,0);  // 腰带
+  addBox(g, 0.5,0.3,0.4, new THREE.MeshStandardMaterial({color:0x111418, emissive:0xffe28a, emissiveIntensity:0.6}), 5.55,3.15,0); // 路牌
+  addBox(g, 11.3,0.4,2.5, darkMat, 0,0.58,0);                 // 底围
+  var lamp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.2,0.4),
+    new THREE.MeshStandardMaterial({color:0xfff4cc, emissive:0xffe9a8, emissiveIntensity:0.95}));
+  lamp.position.set(5.53,0.85,0.85); g.add(lamp);
+  var lamp2=lamp.clone(); lamp2.position.z=-0.85; g.add(lamp2);
+  var tail=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.2,0.36),
+    new THREE.MeshStandardMaterial({color:0xaa1111, emissive:0xdd2222, emissiveIntensity:0.5}));
+  tail.position.set(-5.53,0.85,0.85); g.add(tail);
+  var tail2=tail.clone(); tail2.position.z=-0.85; g.add(tail2);
+  addWheel(g, 3.6, 1.05, 0.55, wheels); addWheel(g, 3.6, -1.05, 0.55, wheels);
+  addWheel(g, -3.6, 1.05, 0.55, wheels); addWheel(g, -3.6, -1.05, 0.55, wheels);
+  return {group:g, wheels:wheels, len:11.4, pitch:0.8};
+}
+
+function buildCrane(v){
+  var g=new THREE.Group(), wheels=[];
+  addBox(g, 12,0.36,1.8, darkMat, 0,0.72,0);                  // 底盘
+  addBox(g, 12,0.3,2.2, mkMat(0x4a4f57,0.5,0.55), 0,1.0,0);   // 台面
+  var cab=new THREE.Group();
+  addBox(cab, 1.9,1.9,2.4, mkMat(v.color), 0,0,0);
+  addBox(cab, 0.12,0.85,1.85, glassMat, 0.92,0.35,0);
+  addBox(cab, 0.8,0.55,0.06, glassMat, -0.15,0.35,1.21);
+  addBox(cab, 2.1,0.4,2.5, darkMat, 0.05,-0.9,0);
+  cab.position.set(4.9,2.1,0); g.add(cab);
+  // 回转支座 + 吊臂（收拢状态，指向车尾并微微抬起）
+  addBox(g, 1.3,1.15,1.7, mkMat(0xd9a520,0.5,0.45), 2.3,1.85,0);
+  var boomMat=mkMat(0xf1c40f,0.5,0.4);
+  var boom=addBox(g, 9.5,0.55,0.85, boomMat, -2.6,2.62,0);
+  boom.rotation.z=-0.08;                                       // 臂身搭在支座上，臂尖向车尾微抬
+  addBox(g, 1.5,1.5,2.3, mkMat(0x3a3d44,0.4,0.6), 3.6,1.85,0); // 配重
+  var hzTex=texCanvas(64,16,function(ctx,w,h){
+    for(var x=0;x<w;x+=16){ ctx.fillStyle=(x/16)%2?'#e6c229':'#151515'; ctx.fillRect(x,0,16,h); }
+  });
+  hzTex.wrapS=THREE.RepeatWrapping; hzTex.repeat.set(2,1);
+  addBox(g, 1.52,0.28,2.32, new THREE.MeshStandardMaterial({map:hzTex, roughness:0.7}), 3.6,1.22,0);
+  // 支腿（收起）
+  addBox(g, 0.35,0.5,0.35, darkMat, -5.4,1.25,1.25);
+  addBox(g, 0.35,0.5,0.35, darkMat, -5.4,1.25,-1.25);
+  addBox(g, 0.35,0.5,0.35, darkMat, 4.6,1.25,1.25);
+  addBox(g, 0.35,0.5,0.35, darkMat, 4.6,1.25,-1.25);
+  var lamp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.16,0.3),
+    new THREE.MeshStandardMaterial({color:0xffe9a8, emissive:0xffdf80, emissiveIntensity:0.9}));
+  lamp.position.set(5.95,1.15,0.8); g.add(lamp);
+  var lamp2=lamp.clone(); lamp2.position.z=-0.8; g.add(lamp2);
+  addWheel(g, 4.7, 1.05, 0.6, wheels); addWheel(g, 4.7, -1.05, 0.6, wheels);
+  addWheel(g, -1.2, 1.05, 0.6, wheels); addWheel(g, -1.2, -1.05, 0.6, wheels);
+  addWheel(g, -2.7, 1.05, 0.6, wheels); addWheel(g, -2.7, -1.05, 0.6, wheels);
+  addWheel(g, -4.2, 1.05, 0.6, wheels); addWheel(g, -4.2, -1.05, 0.6, wheels);
+  return {group:g, wheels:wheels, len:12.4, pitch:0.68};
+}
+
+function buildMixer(v){
+  var g=new THREE.Group(), wheels=[];
+  addBox(g, 10,0.34,1.7, darkMat, 0,0.72,0);                     // 底盘
+  var cab=new THREE.Group();
+  addBox(cab, 1.9,1.85,2.3, mkMat(v.color), 0,0,0);
+  addBox(cab, 0.12,0.8,1.8, glassMat, 0.92,0.35,0);              // 前风挡
+  addBox(cab, 0.8,0.5,0.06, glassMat, -0.2,0.35,1.16);           // 侧窗
+  addBox(cab, 2.1,0.4,2.4, darkMat, 0.05,-0.85,0);               // 保险杠
+  cab.position.set(3.85,1.78,0); g.add(cab);
+  // 搅拌罐：前小后大的锥形圆柱（卸料端更大），素色端盖，避免端面放射条纹
+  var drumTex=texCanvas(256,128,function(ctx,w,h){
+    ctx.fillStyle='#d7dbe0'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#aab1b8'; ctx.lineWidth=13;
+    for(var x=-h;x<w+h;x+=44){
+      ctx.beginPath(); ctx.moveTo(x,h+8); ctx.lineTo(x+h,-8); ctx.stroke();
+    }
+    ctx.strokeStyle='#c0392b'; ctx.lineWidth=9;
+    ctx.beginPath(); ctx.moveTo(0,h*0.66); ctx.lineTo(w,h*0.36); ctx.stroke();
+  });
+  drumTex.wrapS=THREE.RepeatWrapping; drumTex.repeat.set(1.8,1);
+  var sideMat=new THREE.MeshStandardMaterial({map:drumTex, roughness:0.5, metalness:0.35});
+  var capMat=new THREE.MeshStandardMaterial({color:0xcfd4da, roughness:0.55, metalness:0.3});
+  drumSpin=new THREE.Group();
+  drumMesh=new THREE.Mesh(new THREE.CylinderGeometry(1.0,0.72,3.8,24), [sideMat,capMat,capMat]);
+  drumMesh.rotation.z=Math.PI/2;          // 罐轴沿车身；大端朝车尾（卸料端）
+  drumMesh.castShadow=true;
+  drumSpin.add(drumMesh);
+  // 卸料口法兰（大端）+ 进料口（小端），随罐体一起转
+  var port=new THREE.Mesh(new THREE.CylinderGeometry(0.38,0.38,0.3,16), capMat);
+  port.rotation.z=Math.PI/2; port.position.x=-2.0; port.castShadow=true;
+  drumSpin.add(port);
+  var hatch=new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.24,14), capMat);
+  hatch.rotation.z=Math.PI/2; hatch.position.x=1.95; hatch.castShadow=true;
+  drumSpin.add(hatch);
+  drumSpin.position.set(-1.0,2.4,0);
+  drumSpin.rotation.z=-0.12;              // 罐尾微微下沉
+  g.add(drumSpin);
+  // 前鞍座：底座 + 托架，顶面正好贴住罐身前段下缘
+  addBox(g, 0.9,0.14,1.5, mkMat(0x4a4f57,0.5,0.55), 0.8,1.28,0);
+  addBox(g, 0.6,0.55,1.7, mkMat(0x5a5f66,0.5,0.5), 0.8,1.62,0);
+  addBox(g, 0.5,0.35,0.08, mkMat(0x5a5f66,0.5,0.5), 0.8,1.9,0.62);
+  addBox(g, 0.5,0.35,0.08, mkMat(0x5a5f66,0.5,0.5), 0.8,1.9,-0.62);
+  // 后龙门架：两根立柱 + 横梁，横梁顶面贴住罐身尾段下缘
+  addBox(g, 0.12,0.35,0.12, mkMat(0x5a5f66,0.5,0.5), -2.7,1.05,0.7);
+  addBox(g, 0.12,0.35,0.12, mkMat(0x5a5f66,0.5,0.5), -2.7,1.05,-0.7);
+  addBox(g, 0.14,0.1,1.52, mkMat(0x5a5f66,0.5,0.5), -2.7,1.12,0);
+  // 卸料槽：从卸料口下方斜伸向车尾地面
+  var chute=addBox(g, 1.7,0.14,0.42, mkMat(0x8b9199,0.7,0.35), -3.55,1.28,0);
+  chute.rotation.z=0.5;
+  addBox(g, 0.9,0.6,1.4, mkMat(0xd7dbe0,0.4,0.5), 2.55,1.19,0);  // 水箱（坐在底盘上）
+  var lamp=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.16,0.3),
+    new THREE.MeshStandardMaterial({color:0xffe9a8, emissive:0xffdf80, emissiveIntensity:0.9}));
+  lamp.position.set(4.9,0.95,0.75); g.add(lamp);
+  var lamp2=lamp.clone(); lamp2.position.z=-0.75; g.add(lamp2);
+  addWheel(g, 3.85, 1.0, 0.55, wheels); addWheel(g, 3.85, -1.0, 0.55, wheels);
+  addWheel(g, -2.0, 1.0, 0.55, wheels); addWheel(g, -2.0, -1.0, 0.55, wheels);
+  addWheel(g, -3.4, 1.0, 0.55, wheels); addWheel(g, -3.4, -1.0, 0.55, wheels);
+  return {group:g, wheels:wheels, len:10.2, pitch:0.9};
+}
+
+var BUILDERS={truck:buildTruck, bus:buildBus, crane:buildCrane, mixer:buildMixer};
+
+function spawnVehicle(v){
+  removeVehicle();
+  var b=BUILDERS[v.type](v);
+  v.len = b.len;                       // 车长（米）存回车辆数据，供压磅读数模型使用
+  vehicleRoot=b.group; wheels=b.wheels; bodyGroup=b.group;
+  vehicleRoot.position.set(SPAWN_X, 0.32, 0);   // 站上磅台面高度
+  scene.add(vehicleRoot);
+  return b;
+}
+function removeVehicle(){
+  if(vehicleRoot){
+    scene.remove(vehicleRoot);
+    vehicleRoot.traverse(function(o){ if(o.geometry) o.geometry.dispose(); });
+    vehicleRoot=null; wheels=[]; drumSpin=null; drumMesh=null;
+  }
+}
+
+/* ---------------- 状态机 ---------------- */
+var SPAWN_X=-42, EXIT_X=46, STOP_X=0;
+var PLAT_X0=-10, PLAT_X1=10;   // 磅台台面范围（米）
+var idx=0, cur=null;
+var phase='boot';             // boot/idle/entering/onPlatform/confirmed/leaving/done
+var animStart=0, animDur=0, fromX=0, toX=0;
+var lastX=0, wheelAngle=0, camFollowX=0;
+var settledAt=0, stoppedDipAt=0;
+var ledNow=0;
+
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+function easeInQuad(t){ return t*t; }
+
+/* 物理读数模型：秤面只显示「压在磅台上的那部分重量」。
+   车身与磅台的重叠比例 = 当前应显示的重量比例，
+   后轮压上台沿数字才开始涨，整车完全上台才到真实重量。 */
+function platformFrac(x){
+  var rear = x - cur.len/2, front = x + cur.len/2;
+  var o = Math.min(front, PLAT_X1) - Math.max(rear, PLAT_X0);
+  if(o <= 0) return 0;
+  return Math.min(1, o/cur.len);
+}
+
+function setLED(kg){
+  ledNow=kg;
+  ledValue.textContent = fmt(kg);
+  ledScreen.classList.toggle('dim', kg<500);
+}
+
+function loadVehicle(i){
+  idx=i; cur=FLEET[i];
+  spawnVehicle(cur);
+  lastX=SPAWN_X; wheelAngle=0;
+  phase='idle';
+  setLED(0);
+  ledTon.textContent='? 吨';
+  setStatus('st-idle','● 等待车辆上磅');
+  progressChip.textContent='第 '+(i+1)+' / '+FLEET.length+' 辆 · 累计 '+fmt(recordedSum())+' 千克';
+  vehInfo.textContent=cur.name+'（'+cur.state+'）· 请先目测猜一猜：它大约有多重？';
+  toast.classList.add('hidden');
+  setButtons({enter:true});
+  setHint('第 1 步：点击「车辆进场 · 开上磅台」，注意看：数字是什么时候才开始变化的？');
+}
+function recordedSum(){
+  var s=0;
+  for(var i=0;i<idx;i++) s+=FLEET[i].kg;
+  return s;
+}
+
+function onEnterClick(){
+  ensureAudio();
+  horn();
+  startEngine(cur.pitch||1);
+  phase='entering';
+  fromX=SPAWN_X; toX=STOP_X; animDur=9000; animStart=performance.now();
+  lastX=fromX;
+  setButtons({});
+  setStatus('st-run','▲ 称重中 · 数值跳动');
+  setHint('车正在开上磅台 —— 后轮压上磅台的一刻，数字才开始涨起来');
+}
+function confirmReading(){
+  ensureAudio();
+  phase='confirmed';
+  setLED(cur.kg);
+  ledTon.textContent='= '+tonText(cur.kg);
+  setStatus('st-ok','✔ 重量稳定');
+  beep();
+  var kids=Math.round(cur.kg/KG_PER_KID);
+  toastTitle.textContent=fmt(cur.kg)+' 千克 = '+tonText(cur.kg);
+  toastFact.textContent='这辆'+cur.name+'大约相当于 '+kids+' 个三年级同学的体重（每人约 30 千克）';
+  toastWhy.textContent='数一数零头就知道：这么大的数用「千克」写起来太长，用「吨」作单位又快又清楚';
+  toast.classList.remove('hidden');
+  addRecord(idx);
+  progressChip.textContent='第 '+(idx+1)+' / '+FLEET.length+' 辆 · 累计 '+fmt(recordedSum()+cur.kg)+' 千克';
+  setButtons({leave:true});
+  setHint('第 2 步：点击「驶离磅台」，观察车尾离开磅台时，数字怎样一点点变回 0');
+}
+function onLeaveClick(){
+  ensureAudio();
+  phase='leaving';
+  fromX=vehicleRoot?vehicleRoot.position.x:STOP_X;
+  toX=EXIT_X; animDur=5200; animStart=performance.now();
+  lastX=fromX;
+  toast.classList.add('hidden');
+  startEngine((cur.pitch||1)*1.15);
+  setStatus('st-run','▲ 车辆驶离');
+  setButtons({});
+  setHint('车尾离开磅台，重量一点点离开秤面 —— 看数字怎样归零');
+}
+function onNextClick(){
+  ensureAudio();
+  loadVehicle(idx+1);
+}
+
+function afterLeave(){
+  if(idx+1 < FLEET.length){
+    phase='idle';
+    setButtons({next:true});
+    setStatus('st-idle','● 等待车辆上磅');
+    setLED(0); ledTon.textContent='? 吨';
+    setHint('点击「下一辆车」，继续给第 '+(idx+2)+' 辆车过磅');
+  }else{
+    phase='done';
+    removeVehicle();
+    showSummary();
+  }
+}
+
+function addRecord(i){
+  var v=FLEET[i];
+  var tr=document.createElement('tr');
+  var td1=document.createElement('td'); td1.textContent=(i+1);
+  var td2=document.createElement('td'); td2.textContent=v.name+'·'+v.state;
+  var td3=document.createElement('td'); td3.className='num'; td3.textContent=fmt(v.kg);
+  var td4=document.createElement('td'); td4.className='num';
+  td4.textContent = v.kg%1000===0 ? fmt(v.kg/1000) : (v.kg/1000).toFixed(1);
+  tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+  recBody.appendChild(tr);
+}
+
+function showSummary(){
+  var total=0, maxV=FLEET[0], minV=FLEET[0];
+  sumBody.innerHTML='';
+  FLEET.forEach(function(v,i){
+    total+=v.kg;
+    if(v.kg>maxV.kg) maxV=v;
+    if(v.kg<minV.kg) minV=v;
+    var tr=document.createElement('tr');
+    var td1=document.createElement('td'); td1.textContent=(i+1);
+    var td2=document.createElement('td'); td2.textContent=v.name;
+    var td3=document.createElement('td'); td3.textContent=v.state;
+    var td4=document.createElement('td'); td4.className='num'; td4.textContent=fmt(v.kg);
+    var td5=document.createElement('td'); td5.className='num';
+    td5.textContent = v.kg%1000===0 ? fmt(v.kg/1000) : (v.kg/1000).toFixed(1);
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
+    sumBody.appendChild(tr);
+  });
+  var trT=document.createElement('tr'); trT.className='total';
+  var c1=document.createElement('td'); c1.colSpan=3; c1.textContent='合计（10 辆重型车）';
+  var c2=document.createElement('td'); c2.className='num'; c2.textContent=fmt(total);
+  var c3=document.createElement('td'); c3.className='num';
+  c3.textContent = total%1000===0 ? fmt(total/1000) : (total/1000).toFixed(1);
+  trT.appendChild(c1); trT.appendChild(c2); trT.appendChild(c3);
+  sumBody.appendChild(trT);
+  sumText.textContent='10 辆重型车一共 '+fmt(total)+' 千克，也就是 '+(total/1000).toFixed(1)+' 吨。'+
+    '最重的是'+maxV.name+'（'+maxV.state+'，'+(maxV.kg/1000)+' 吨），最轻的是'+minV.name+'（'+minV.state+'，'+
+    (minV.kg/1000)+' 吨）——相差接近 '+(maxV.kg/minV.kg).toFixed(1)+' 倍。'+
+    '全部加起来大约相当于 '+Math.round(total/KG_PER_ELEPHANT)+' 头 6 吨重的大象！'+
+    '记住：称大象、卡车这样的大质量，用「吨」作单位最合适。1 吨 = 1000 千克。';
+  summary.classList.remove('hidden');
+}
+
+btnEnter.addEventListener('click', function(){ if(!btnEnter.disabled && phase==='idle') onEnterClick(); });
+btnLeave.addEventListener('click', function(){ if(!btnLeave.disabled && phase==='confirmed') onLeaveClick(); });
+btnNext.addEventListener('click', function(){ if(!btnNext.disabled && phase==='idle') onNextClick(); });
+btnRestart.addEventListener('click', function(){
+  summary.classList.add('hidden');
+  recBody.innerHTML='';
+  loadVehicle(0);
+});
+
+/* ---------------- 主循环 ---------------- */
+function dipOffset(now){
+  // 停稳时悬挂下沉并衰减抖动
+  if(!stoppedDipAt) return 0;
+  var t=(now-stoppedDipAt)/1000;
+  if(t>2.2) return 0;
+  return -0.055*Math.exp(-1.8*t)*Math.cos(t*11);
+}
+
+function tick(now){
+  requestAnimationFrame(tick);
+  if(phase==='entering' || phase==='leaving'){
+    var t=(now-animStart)/animDur;
+    if(t>1) t=1;
+    var p = phase==='entering' ? easeInOutCubic(t) : easeInQuad(t);
+    var x = fromX + (toX-fromX)*p;
+    var dx = x-lastX; lastX=x;
+    wheelAngle += dx/0.55*57.2958;
+    if(vehicleRoot){
+      vehicleRoot.position.x=x;
+      vehicleRoot.position.y=0.32;
+      wheels.forEach(function(w){ w.rotation.z = -wheelAngle*Math.PI/180; });
+      if(drumMesh) drumMesh.rotateY(0.03);   // 罐体绕自身轴自转（进/出场时发动机带动）
+    }
+    engineSet(Math.min(1, Math.abs(dx)/0.55));
+    // 摄像机轻微跟随
+    camFollowX += (x*0.22 - camFollowX)*0.04;
+    camera.position.x = camFollowX;
+    camera.lookAt(0, 2.2, 0);
+    // 显示屏
+    if(phase==='entering'){
+      var target=cur.kg*platformFrac(x);
+      setLED(Math.max(0, target + (target>200 ? (Math.random()-0.5)*cur.kg*0.035 : 0)));
+      if(t>=1){
+        phase='onPlatform'; settledAt=now; stoppedDipAt=now;
+        engineIdle(); hiss();
+        setStatus('st-run','▲ 停稳中 · 数值收敛');
+        setHint('车已停上磅台。等数字完全稳定后，会自动锁定读数…');
+      }
+    }else{
+      var target2=cur.kg*platformFrac(x);
+      setLED(Math.max(0, target2 + (target2>200 ? (Math.random()-0.5)*cur.kg*0.035 : 0)));
+      if(t>=1){
+        camFollowX=0; camera.position.x=0; camera.lookAt(0,2.2,0);
+        stopEngine(0.8);
+        afterLeave();
+      }
+    }
+  }
+  else if(phase==='onPlatform'){
+    var el=(now-settledAt)/1000;
+    var decay=Math.max(0, 1-el/3);
+    var amp=cur.kg*(0.012*decay+0.0004);
+    setLED(cur.kg+(Math.random()-0.5)*2*amp);
+    if(el>2.4) confirmReading();   // 停稳是自然物理过程：数字收敛后自动锁定读数
+    if(vehicleRoot){
+      vehicleRoot.position.y = 0.32 + dipOffset(now);
+      wheels.forEach(function(w){ w.rotation.z = -wheelAngle*Math.PI/180; });
+    }
+  }
+  else if(phase==='confirmed'){
+    setLED(cur.kg);
+    if(vehicleRoot){
+      vehicleRoot.position.y = 0.32 + dipOffset(now);
+    }
+  }
+  if(renderer) renderer.render(scene, camera);
+}
+
+/* ---------------- 自检（供质检脚本调用） ---------------- */
+window.__selfTest = function(){
+  var errs=[];
+  if(FLEET.length!==10) errs.push('车队应为 10 辆，实际 '+FLEET.length);
+  FLEET.forEach(function(v,i){
+    if(v.kg%500!==0) errs.push('第'+(i+1)+'辆 '+v.name+' 重量 '+v.kg+' 不是整五百千克');
+  });
+  return {pass:errs.length===0, errors:errs};
+};
+
+/* ---------------- 启动 ---------------- */
+(function boot(){
+  if(typeof THREE==='undefined'){ $('glFail').style.display='flex'; $('glFail').textContent='3D 库加载失败：请确认 three.min.js 与课件在同一文件夹，或联网后重试。'; return; }
+  if(!initThree()) return;
+  loadVehicle(0);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
